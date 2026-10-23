@@ -1,0 +1,1374 @@
+/* =========================================================
+   ui.js — everything the user can see or click.
+
+   The UI never owns data. It reads from Library and Player,
+   then paints the screen. When something changes, the player
+   sends an event and only the needed part is repainted.
+   ========================================================= */
+(function () {
+  'use strict';
+
+  const els = {};
+
+  const state = {
+    view: 'all',
+    search: '',
+    sort: 'added-desc',
+    visible: [],
+    rendered: 0,
+    limit: 200,
+  };
+
+  let scrubbing = false;
+  let vizFrame = 0;
+  let vizBars = new Array(56).fill(0);
+
+  /* =========================================================
+     Small builders
+     ========================================================= */
+  function thumbNode(track, extraClass) {
+    const node = U.el('div', { class: (extraClass || 'thumb') + (track.thumb ? '' : ' placeholder') });
+    if (track.thumb) {
+      node.style.backgroundImage = 'url("' + track.thumb + '")';
+    } else {
+      node.style.setProperty('--hue', String(U.hue(track.title)));
+      node.textContent = U.initials(track.title);
+    }
+    return node;
+  }
+
+  function placeholder(node, label, useIcon) {
+    node.style.removeProperty('background-image');
+    node.classList.add('placeholder');
+    node.style.setProperty('--hue', String(U.hue(label || 'music')));
+    node.textContent = '';
+    if (useIcon) node.appendChild(U.icon('music'));
+    else node.textContent = U.initials(label);
+  }
+
+  /* =========================================================
+     Row / list rendering
+     ========================================================= */
+  function rowFor(track, index) {
+    const isCurrent = track.id === Player.state.currentId;
+
+    const row = U.el('div', {
+      class:
+        'row' +
+        (isCurrent ? ' is-current' : '') +
+        (isCurrent && Player.isPlaying ? ' is-playing' : '') +
+        (track.favorite ? ' has-favorite' : ''),
+      dataset: { id: track.id },
+      role: 'option',
+      tabindex: '0',
+      'aria-selected': isCurrent ? 'true' : 'false',
+      'aria-label': track.title + ' — ' + (track.artist || 'Unknown artist'),
+    });
+
+    const bars = U.el('span', { class: 'bars', 'aria-hidden': 'true' }, [
+      U.el('i'),
+      U.el('i'),
+      U.el('i'),
+    ]);
+
+    const idx = U.el('div', { class: 'cell idx' }, [
+      U.el('span', { class: 'idx-num', text: String(index + 1) }),
+      bars,
+    ]);
+
+    const titleCell = U.el('div', { class: 'cell title-cell' }, [
+      thumbNode(track),
+      U.el('div', { class: 'title-text' }, [
+        U.el('div', { class: 'title', text: track.title }),
+        U.el('div', { class: 'artist', text: track.artist || 'Unknown artist' }),
+      ]),
+    ]);
+
+    const album = U.el('div', { class: 'cell album', text: track.album || '—' });
+    const time = U.el('div', { class: 'cell time', text: U.fmtTime(track.duration) });
+
+    const fav = U.el(
+      'button',
+      {
+        class: 'icon-btn fav-btn' + (track.favorite ? ' is-on' : ''),
+        dataset: { rowAction: 'fav', id: track.id },
+        'aria-label': track.favorite ? 'Remove from favorites' : 'Add to favorites',
+        'aria-pressed': String(Boolean(track.favorite)),
+        title: 'Favorite (F)',
+      },
+      [U.icon('heart')]
+    );
+
+    const remove = U.el(
+      'button',
+      {
+        class: 'icon-btn danger',
+        dataset: { rowAction: 'remove', id: track.id },
+        'aria-label': 'Remove from library',
+        title: 'Remove from library',
+      },
+      [U.icon('trash')]
+    );
+
+    row.appendChild(idx);
+    row.appendChild(titleCell);
+    row.appendChild(album);
+    row.appendChild(time);
+    row.appendChild(U.el('div', { class: 'cell actions' }, [fav, remove]));
+
+    return row;
+  }
+
+  function appendRows() {
+    const items = state.visible;
+    const end = Math.min(items.length, state.rendered + state.limit);
+    if (state.rendered >= end) {
+      els.listFoot.hidden = true;
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (let i = state.rendered; i < end; i++) {
+      fragment.appendChild(rowFor(items[i], i));
+    }
+    els.list.appendChild(fragment);
+    state.rendered = end;
+
+    if (end < items.length) {
+      els.listFoot.hidden = false;
+      els.listFoot.textContent = 'Showing ' + end + ' of ' + items.length + '…';
+    } else {
+      els.listFoot.hidden = true;
+    }
+  }
+
+  function renderList(preserveScroll) {
+    const previousTop = preserveScroll ? els.list.scrollTop : 0;
+    const previousCount = state.rendered;
+
+    state.visible = Library.list(state);
+    state.rendered = 0;
+    state.limit = preserveScroll ? Math.max(200, previousCount) : 200;
+
+    els.list.textContent = '';
+    els.list.hidden = state.visible.length === 0;
+    els.listHead.hidden = state.visible.length === 0;
+    els.empty.hidden = state.visible.length > 0;
+
+    appendRows();
+    updateEmpty();
+    updateHeader();
+    updateNav();
+    markCurrentRow();
+
+    els.list.scrollTop = previousTop;
+  }
+
+  function updateHeader() {
+    const total = Library.count(state.view);
+    const shown = state.visible.length;
+
+    els.countAll.textContent = String(Library.count('all'));
+    els.countFav.textContent = String(Library.count('favorites'));
+
+    els.viewTitle.textContent = state.view === 'favorites' ? 'Favorites' : 'All songs';
+
+    const parts = [];
+    if (total === 0) {
+      parts.push(state.view === 'favorites' ? 'No favorites yet' : 'No songs yet');
+    } else if (shown === total) {
+      parts.push(total + (total === 1 ? ' song' : ' songs'));
+    } else {
+      parts.push(shown + ' of ' + total + ' songs');
+    }
+
+    const duration = state.visible.reduce((sum, track) => sum + (track.duration || 0), 0);
+    if (duration > 0) parts.push(U.fmtTime(duration));
+
+    els.viewMeta.textContent = parts.join(' · ');
+  }
+
+  function updateNav() {
+    U.$$('.nav-item').forEach((item) => {
+      const active = item.dataset.view === state.view;
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-current', active ? 'page' : 'false');
+    });
+  }
+
+  function updateEmpty() {
+    const hasSongs = Library.tracks.length > 0;
+    const searching = state.search.trim().length > 0;
+
+    if (!hasSongs) {
+      els.emptyTitle.textContent = 'Your library is empty';
+      els.emptyText.textContent = 'Drop your audio files anywhere on this page.';
+      els.emptyActions.hidden = false;
+      els.emptyNote.hidden = false;
+    } else if (searching) {
+      els.emptyTitle.textContent = 'Nothing found';
+      els.emptyText.textContent = 'No song matches “' + state.search.trim() + '”.';
+      els.emptyActions.hidden = true;
+      els.emptyNote.hidden = true;
+    } else if (state.view === 'favorites') {
+      els.emptyTitle.textContent = 'No favorites yet';
+      els.emptyText.textContent = 'Press the heart next to a song to keep it here.';
+      els.emptyActions.hidden = true;
+      els.emptyNote.hidden = true;
+    } else {
+      els.emptyTitle.textContent = 'Nothing here';
+      els.emptyText.textContent = 'Try another view.';
+      els.emptyActions.hidden = true;
+      els.emptyNote.hidden = true;
+    }
+  }
+
+  function markCurrentRow() {
+    const currentId = Player.state.currentId;
+    const playing = Player.isPlaying;
+
+    U.$$('.row', els.list).forEach((row) => {
+      const isCurrent = row.dataset.id === currentId;
+      row.classList.toggle('is-current', isCurrent);
+      row.classList.toggle('is-playing', isCurrent && playing);
+      row.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+    });
+  }
+
+  /* =========================================================
+     Player bar and now playing panel
+     ========================================================= */
+  function setArtwork(track) {
+    if (!track) {
+      placeholder(els.npArtInner, 'music', true);
+      placeholder(els.npCoverBigInner, 'music', true);
+      els.npBg.style.backgroundImage = 'none';
+      return;
+    }
+
+    if (track.thumb) {
+      els.npArtInner.classList.remove('placeholder');
+      els.npArtInner.style.backgroundImage = 'url("' + track.thumb + '")';
+      els.npArtInner.textContent = '';
+    } else {
+      placeholder(els.npArtInner, track.title, false);
+    }
+
+    const bigCover = (url) => {
+      if (Player.state.currentId !== track.id) return;
+      els.npCoverBigInner.classList.remove('placeholder');
+      els.npCoverBigInner.style.backgroundImage = 'url("' + url + '")';
+      els.npCoverBigInner.textContent = '';
+      els.npBg.style.backgroundImage = 'url("' + url + '")';
+    };
+
+    if (track.thumb) bigCover(track.thumb);
+    else placeholder(els.npCoverBigInner, track.title, false);
+
+    if (track.hasArt) {
+      Player.artFor(track.id).then((url) => {
+        if (url) bigCover(url);
+      });
+    }
+  }
+
+  function renderModes() {
+    U.$$('[data-act="shuffle"]').forEach((button) => {
+      const on = Player.state.shuffle;
+      button.classList.toggle('is-on', on);
+      button.setAttribute('aria-pressed', String(on));
+      button.title = on ? 'Shuffle: on (S)' : 'Shuffle: off (S)';
+    });
+
+    U.$$('[data-act="repeat"]').forEach((button) => {
+      const mode = Player.state.repeat;
+      const label =
+        mode === 'one' ? 'Repeat: one song' : mode === 'all' ? 'Repeat: all songs' : 'Repeat: off';
+      button.classList.toggle('is-on', mode !== 'off');
+      button.setAttribute('aria-pressed', String(mode !== 'off'));
+      button.setAttribute('aria-label', label);
+      button.title = label + ' (R)';
+    });
+
+    document.body.dataset.repeat = Player.state.repeat;
+  }
+
+  function renderVolume() {
+    const percent = Player.state.muted ? 0 : Math.round(Player.state.volume * 100);
+
+    U.$$('.vol').forEach((input) => {
+      input.value = String(percent);
+      input.style.setProperty('--fill', percent + '%');
+      input.setAttribute('aria-valuetext', percent + '%');
+    });
+
+    const muted = Player.state.muted || Player.state.volume === 0;
+    U.$$('.js-icon-vol > use').forEach((use) => {
+      use.setAttribute('href', muted ? '#i-mute' : '#i-volume');
+    });
+    U.$$('[data-act="mute"]').forEach((button) => {
+      button.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+      button.setAttribute('aria-pressed', String(muted));
+      button.classList.toggle('is-on', muted);
+    });
+  }
+
+  function renderSpeed() {
+    U.$$('[data-act="speed"]').forEach((button) => {
+      button.textContent = Player.state.speed + '×';
+      button.setAttribute('aria-label', 'Playback speed: ' + Player.state.speed + '×');
+    });
+  }
+
+  function renderPlayer() {
+    const track = Player.track;
+    const playing = Player.isPlaying;
+
+    U.$$('.js-icon-play > use').forEach((use) => {
+      use.setAttribute('href', playing ? '#i-pause' : '#i-play');
+    });
+    U.$$('[data-act="togglePlay"]').forEach((button) => {
+      button.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    });
+
+    els.npTitle.textContent = track ? track.title : 'Nothing playing';
+    els.npArtist.textContent = track ? track.artist || 'Unknown artist' : 'Add songs to begin';
+
+    els.bigTitle.textContent = track ? track.title : 'Nothing playing';
+    els.bigArtist.textContent = track
+      ? [track.artist || 'Unknown artist', track.album].filter(Boolean).join(' — ')
+      : 'Pick a song from your library';
+
+    U.$$('.fav-btn').forEach((button) => {
+      const on = Boolean(track && track.favorite);
+      button.classList.toggle('is-on', on);
+      button.setAttribute('aria-pressed', String(on));
+      button.setAttribute('aria-label', on ? 'Remove from favorites' : 'Add to favorites');
+    });
+
+    setArtwork(track);
+    renderModes();
+    renderVolume();
+    renderSpeed();
+  }
+
+  function renderTime(current, duration) {
+    const total = duration || Player.duration || 0;
+    const now = Math.min(current || 0, total || 0);
+
+    U.$$('[data-role="timeCur"]').forEach((node) => {
+      node.textContent = U.fmtTime(now);
+    });
+    U.$$('[data-role="timeDur"]').forEach((node) => {
+      node.textContent = U.fmtTime(total);
+    });
+
+    const percent = total > 0 ? (now / total) * 100 : 0;
+
+    U.$$('.seek').forEach((input) => {
+      input.style.setProperty('--fill', percent.toFixed(2) + '%');
+      if (!scrubbing) input.value = String(Math.round(percent * 10));
+      input.setAttribute('aria-valuetext', U.fmtTime(now) + ' of ' + U.fmtTime(total));
+    });
+  }
+
+  function renderQueue() {
+    const queue = Player.state.queue;
+    els.queueMeta.textContent = queue.length + (queue.length === 1 ? ' song' : ' songs');
+    els.queueList.textContent = '';
+
+    if (!queue.length) {
+      els.queueList.appendChild(
+        U.el('p', { class: 'q-empty', text: 'The queue is empty. Play a song to fill it.' })
+      );
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    queue.forEach((id) => {
+      const track = Library.byId.get(id);
+      if (!track) return;
+
+      const isCurrent = id === Player.state.currentId;
+
+      const row = U.el('div', {
+        class: 'q-row' + (isCurrent ? ' is-current' : ''),
+        dataset: { qid: id },
+        role: 'button',
+        tabindex: '0',
+        'aria-label': 'Play ' + track.title,
+      });
+
+      row.appendChild(thumbNode(track, 'q-thumb'));
+      row.appendChild(
+        U.el('div', { class: 'q-text' }, [
+          U.el('div', { class: 'q-title', text: track.title }),
+          U.el('div', { class: 'q-artist', text: track.artist || 'Unknown artist' }),
+        ])
+      );
+      row.appendChild(U.el('span', { class: 'q-time', text: U.fmtTime(track.duration) }));
+      row.appendChild(
+        U.el(
+          'button',
+          {
+            class: 'icon-btn',
+            dataset: { rowAction: 'qremove', id: track.id },
+            'aria-label': 'Remove from queue',
+            title: 'Remove from queue',
+          },
+          [U.icon('x')]
+        )
+      );
+
+      fragment.appendChild(row);
+    });
+
+    els.queueList.appendChild(fragment);
+  }
+
+  /* =========================================================
+     Visualizer
+     ========================================================= */
+  function vizPath(ctx, x, y, w, h, r) {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + w, y, x + w, y + h, radius);
+    ctx.arcTo(x + w, y + h, x, y + h, radius);
+    ctx.arcTo(x, y + h, x, y, radius);
+    ctx.arcTo(x, y, x + w, y, radius);
+    ctx.closePath();
+  }
+
+  function drawViz() {
+    const canvas = els.viz;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+    }
+
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const analyser = Player.getVisualizer();
+
+    const count = vizBars.length;
+    const gap = Math.max(2, width * 0.005);
+    const barWidth = (width - gap * (count - 1)) / count;
+    const gradient = ctx.createLinearGradient(0, height, 0, 0);
+    gradient.addColorStop(0, 'rgba(139, 92, 246, 0.95)');
+    gradient.addColorStop(1, 'rgba(34, 211, 238, 0.9)');
+
+    for (let i = 0; i < count; i++) {
+      let target = 0;
+
+      if (analyser) {
+        /* Low frequencies look better when they get more bars. */
+        const index = Math.min(
+          analyser.data.length - 1,
+          Math.floor(Math.pow(i / count, 1.5) * analyser.data.length)
+        );
+        target = analyser.data[index] / 255;
+      }
+
+      if (!Player.isPlaying) target *= 0.2;
+      vizBars[i] += (target - vizBars[i]) * 0.3;
+
+      const barHeight = Math.max(2, vizBars[i] * (height - 4));
+      ctx.fillStyle = gradient;
+      vizPath(ctx, i * (barWidth + gap), height - barHeight, barWidth, barHeight, 2.5);
+      ctx.fill();
+    }
+  }
+
+  function startViz() {
+    stopViz();
+    const loop = () => {
+      drawViz();
+      vizFrame = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+
+  function stopViz() {
+    if (vizFrame) cancelAnimationFrame(vizFrame);
+    vizFrame = 0;
+  }
+
+  /* =========================================================
+     Panels
+     ========================================================= */
+  function showScrim() {
+    els.scrim.hidden = false;
+    requestAnimationFrame(() => els.scrim.classList.add('is-open'));
+  }
+
+  function hideScrim() {
+    if (els.queue.classList.contains('is-open') || els.sidebar.classList.contains('is-open')) return;
+    els.scrim.classList.remove('is-open');
+  }
+
+  function openSidebar() {
+    els.sidebar.classList.add('is-open');
+    showScrim();
+  }
+
+  function closeSidebar() {
+    if (!els.sidebar.classList.contains('is-open')) return;
+    els.sidebar.classList.remove('is-open');
+    hideScrim();
+  }
+
+  function openQueue() {
+    renderQueue();
+    els.queue.classList.add('is-open');
+    els.queue.setAttribute('aria-hidden', 'false');
+    els.scrim.hidden = false;
+    showScrim();
+    const current = els.queueList.querySelector('.q-row.is-current');
+    if (current) current.scrollIntoView({ block: 'center' });
+  }
+
+  function closeQueue() {
+    if (!els.queue.classList.contains('is-open')) return;
+    els.queue.classList.remove('is-open');
+    els.queue.setAttribute('aria-hidden', 'true');
+    hideScrim();
+  }
+
+  function toggleQueue() {
+    if (els.queue.classList.contains('is-open')) closeQueue();
+    else openQueue();
+  }
+
+  function openNowPlaying() {
+    if (!Player.track) return;
+    els.nowPlaying.classList.add('is-open');
+    els.nowPlaying.setAttribute('aria-hidden', 'false');
+
+    const graph = Player.ensureGraph();
+    if (graph.ctx && graph.ctx.state === 'suspended') {
+      graph.ctx.resume().catch(() => {});
+    }
+    startViz();
+  }
+
+  function closeNowPlaying() {
+    if (!els.nowPlaying.classList.contains('is-open')) return;
+    els.nowPlaying.classList.remove('is-open');
+    els.nowPlaying.setAttribute('aria-hidden', 'true');
+    stopViz();
+  }
+
+  function closePanels() {
+    closeQueue();
+    closeSidebar();
+  }
+
+  /* =========================================================
+     Toast + confirm
+     ========================================================= */
+  function toast(message, options) {
+    const opts = options || {};
+    const iconName = opts.icon || (opts.type === 'error' ? 'x' : 'music');
+    const text = U.el('span', { class: 'toast-text', text: message });
+    const node = U.el('div', { class: 'toast' + (opts.type ? ' is-' + opts.type : '') }, [
+      U.icon(opts.icon || iconName),
+      text,
+    ]);
+
+    els.toasts.appendChild(node);
+
+    let timer = null;
+    const close = () => {
+      if (!node.isConnected) return;
+      clearTimeout(timer);
+      node.classList.add('is-out');
+      setTimeout(() => node.remove(), 240);
+    };
+
+    if (opts.duration !== 0) timer = setTimeout(close, opts.duration || 2800);
+
+    return {
+      node,
+      close,
+      set(value) {
+        text.textContent = value;
+      },
+    };
+  }
+
+  function confirmDialog(title, text, okLabel) {
+    els.confirmTitle.textContent = title;
+    els.confirmText.textContent = text;
+    els.confirmOk.textContent = okLabel || 'Delete';
+    els.confirm.showModal();
+
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        if (els.confirm.open) els.confirm.close();
+        resolve(value);
+      };
+      els.confirmOk.onclick = () => finish(true);
+      els.confirmCancel.onclick = () => finish(false);
+      els.confirm.oncancel = (event) => {
+        event.preventDefault();
+        finish(false);
+      };
+    });
+  }
+
+  /* =========================================================
+     Actions
+     ========================================================= */
+  function playRow(id) {
+    if (id === Player.state.currentId) {
+      Player.toggle();
+      return;
+    }
+    const ids = state.visible.map((track) => track.id);
+    if (!ids.includes(id)) ids.push(id);
+    Player.playIds(ids, id);
+  }
+
+  async function toggleFavorite(id) {
+    if (!id) return;
+    const value = await Library.toggleFavorite(id);
+    if (value === null) return;
+
+    if (state.view === 'favorites') {
+      renderList(true);
+    } else {
+      U.$$('.row', els.list).forEach((row) => {
+        if (row.dataset.id !== id) return;
+        row.classList.toggle('has-favorite', value);
+        const button = row.querySelector('[data-row-action="fav"]');
+        if (!button) return;
+        button.classList.toggle('is-on', value);
+        button.setAttribute('aria-pressed', String(value));
+        button.setAttribute('aria-label', value ? 'Remove from favorites' : 'Add to favorites');
+      });
+      updateHeader();
+    }
+
+    if (Player.state.currentId === id) renderPlayer();
+  }
+
+  async function removeTrack(id) {
+    const track = Library.byId.get(id);
+    if (!track) return;
+
+    const wasCurrent = Player.state.currentId === id;
+    const wasPlaying = Player.isPlaying;
+
+    try {
+      await Library.remove(id);
+    } catch (error) {
+      toast('Could not remove this song.', { type: 'error' });
+      return;
+    }
+
+    if (wasCurrent) {
+      const remaining = Player.state.queue.filter((queuedId) => queuedId !== id);
+      const nextId = remaining[Math.min(Player.state.pos, remaining.length - 1)];
+      Player.removeFromQueue(id);
+      if (nextId) Player.load(nextId, { autoplay: wasPlaying });
+      else Player.stop();
+    } else {
+      Player.removeFromQueue(id);
+    }
+
+    renderList(true);
+    renderQueue();
+    refreshStorage();
+    toast('Removed “' + track.title + '” from the library');
+  }
+
+  async function clearLibrary() {
+    if (!Library.tracks.length) {
+      toast('The library is already empty');
+      return;
+    }
+
+    const ok = await confirmDialog(
+      'Clear the whole library?',
+      'This deletes ' +
+        Library.tracks.length +
+        ' songs from this browser. Your original files on disk are not touched.',
+      'Clear library'
+    );
+    if (!ok) return;
+
+    try {
+      await Library.clear();
+    } catch (error) {
+      toast('Could not clear the library.', { type: 'error' });
+      return;
+    }
+
+    Player.stop();
+    state.search = '';
+    els.search.value = '';
+    els.searchClear.hidden = true;
+    renderList();
+    renderQueue();
+    refreshStorage();
+    toast('Library cleared');
+  }
+
+  /* =========================================================
+     Import
+     ========================================================= */
+  async function filesFromDrop(dataTransfer) {
+    const items = dataTransfer.items;
+    const entries = [];
+
+    if (items && items.length) {
+      for (const item of items) {
+        if (item.kind !== 'file') continue;
+        const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+        if (entry) entries.push(entry);
+      }
+    }
+
+    if (!entries.length) return Array.from(dataTransfer.files || []);
+
+    const files = [];
+    const readEntry = (entry) =>
+      new Promise((resolve) => {
+        if (entry.isFile) {
+          entry.file(
+            (file) => {
+              files.push(file);
+              resolve();
+            },
+            () => resolve()
+          );
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const readBatch = () => {
+            reader.readEntries(
+              async (batch) => {
+                if (!batch.length) {
+                  resolve();
+                  return;
+                }
+                for (const child of batch) await readEntry(child);
+                readBatch();
+              },
+              () => resolve()
+            );
+          };
+          readBatch();
+        } else {
+          resolve();
+        }
+      });
+
+    for (const entry of entries) await readEntry(entry);
+    return files;
+  }
+
+  async function importFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    if (!files.some(isAudioFile)) {
+      toast('No audio files in that drop.', { type: 'error' });
+      return;
+    }
+
+    const progress = toast('Preparing ' + files.length + ' files…', { duration: 0 });
+
+    let report;
+    try {
+      report = await Library.importFiles(files, (info) => {
+        const done = info.added + info.skipped + info.failed;
+        progress.set('Adding ' + Math.min(done, info.total) + ' of ' + info.total + '…');
+      });
+    } catch (error) {
+      console.error(error);
+      progress.close();
+      toast('Could not add those files.', { type: 'error', duration: 4000 });
+      return;
+    }
+
+    progress.close();
+
+    if (report.added) {
+      renderList();
+
+      /* Nothing was selected yet: show the first song, paused. */
+      if (!Player.state.currentId && state.visible.length) {
+        Player.restore(
+          state.visible.map((track) => track.id),
+          state.visible[0].id,
+          0
+        );
+      }
+
+      /* New songs join the end of the queue. */
+      Player.appendToQueue(report.ids);
+      renderQueue();
+    }
+
+    const parts = [];
+    if (report.added) parts.push(report.added + (report.added === 1 ? ' song added' : ' songs added'));
+    if (report.skipped) parts.push(report.skipped + ' already there');
+    if (report.failed) parts.push(report.failed + ' failed');
+
+    if (parts.length) {
+      toast(parts.join(' · '), {
+        type: report.failed && !report.added ? 'error' : undefined,
+        duration: 3400,
+      });
+    }
+
+    refreshStorage();
+  }
+
+  async function refreshStorage() {
+    const info = await DB.estimate();
+    if (!info || !info.quota) {
+      els.storageText.textContent = '—';
+      els.storageFill.style.width = '0%';
+      return;
+    }
+    const percent = Math.min(100, (info.usage / info.quota) * 100);
+    els.storageText.textContent = U.fmtBytes(info.usage) + ' of ' + U.fmtBytes(info.quota);
+    els.storageFill.style.width = Math.max(1.5, percent).toFixed(1) + '%';
+  }
+
+  /* =========================================================
+     Theme + prefs
+     ========================================================= */
+  function setTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    U.store.set('theme', theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#f2f3f9' : '#08080d');
+  }
+
+  function toggleTheme() {
+    setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+  }
+
+  function setView(view) {
+    if (state.view === view) return;
+    state.view = view;
+    U.store.set('view', view);
+    renderList();
+  }
+
+  function setSearch(value) {
+    state.search = value;
+    renderList();
+  }
+
+  function setSort(value) {
+    state.sort = value;
+    U.store.set('sort', value);
+    renderList();
+  }
+
+  /* =========================================================
+     Events
+     ========================================================= */
+  function handleAction(action) {
+    switch (action) {
+      case 'togglePlay':
+        Player.toggle();
+        break;
+      case 'play':
+        Player.play();
+        break;
+      case 'pause':
+        Player.pause();
+        break;
+      case 'next':
+        Player.next();
+        break;
+      case 'prev':
+        Player.prev();
+        break;
+      case 'shuffle':
+        Player.toggleShuffle();
+        break;
+      case 'repeat':
+        Player.cycleRepeat();
+        break;
+      case 'mute':
+        Player.toggleMute();
+        break;
+      case 'speed':
+        Player.cycleSpeed();
+        break;
+      case 'favorite':
+        toggleFavorite(Player.state.currentId);
+        break;
+      case 'queue':
+        toggleQueue();
+        break;
+      case 'addFiles':
+        els.fileInput.click();
+        break;
+      case 'addFolder':
+        els.folderInput.click();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function bindEvents() {
+    /* One click handler for the whole page. Buttons announce what they do
+       with data-act, rows use data-row-action. */
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+
+      const closer = target.closest && target.closest('[data-close]');
+      if (closer) {
+        if (closer.dataset.close === 'queue') closeQueue();
+        if (closer.dataset.close === 'nowPlaying') closeNowPlaying();
+        return;
+      }
+
+      if (target.closest && target.closest('[data-close-dialog]')) {
+        const dialog = target.closest('dialog');
+        if (dialog) dialog.close();
+        return;
+      }
+
+      const rowAction = target.closest && target.closest('[data-row-action]');
+      if (rowAction) {
+        event.stopPropagation();
+        const action = rowAction.dataset.rowAction;
+        const id =
+          rowAction.dataset.id ||
+          (rowAction.closest('.row') ? rowAction.closest('.row').dataset.id : null);
+
+        if (action === 'fav') toggleFavorite(id);
+        else if (action === 'remove') removeTrack(id);
+        else if (action === 'qremove') {
+          Player.removeFromQueue(id);
+          renderQueue();
+          markCurrentRow();
+        }
+        return;
+      }
+
+      const actionButton = target.closest && target.closest('[data-act]');
+      if (actionButton) {
+        handleAction(actionButton.dataset.act);
+        return;
+      }
+
+      const queueRow = target.closest && target.closest('.q-row');
+      if (queueRow) {
+        Player.load(queueRow.dataset.qid, { autoplay: true });
+        return;
+      }
+
+      const row = target.closest && target.closest('.row');
+      if (row) playRow(row.dataset.id);
+    });
+
+    /* ---------- sidebar / nav ---------- */
+    U.$$('.nav-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        setView(item.dataset.view);
+        closeSidebar();
+      });
+    });
+
+    els.btnMenu.addEventListener('click', openSidebar);
+    els.btnCloseSidebar.addEventListener('click', closeSidebar);
+    els.scrim.addEventListener('click', closePanels);
+
+    /* ---------- theme, help, clear ---------- */
+    els.btnTheme.addEventListener('click', toggleTheme);
+    els.btnHelp.addEventListener('click', () => els.helpDialog.showModal());
+    els.btnClear.addEventListener('click', clearLibrary);
+
+    /* ---------- search / sort ---------- */
+    els.search.addEventListener(
+      'input',
+      U.debounce(() => {
+        const value = els.search.value;
+        els.searchClear.hidden = value.length === 0;
+        setSearch(value);
+      }, 120)
+    );
+
+    els.search.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        els.search.value = '';
+        els.searchClear.hidden = true;
+        setSearch('');
+        els.search.blur();
+      }
+    });
+
+    els.searchClear.addEventListener('click', () => {
+      els.search.value = '';
+      els.searchClear.hidden = true;
+      setSearch('');
+      els.search.focus();
+    });
+
+    els.sort.addEventListener('change', () => setSort(els.sort.value));
+
+    /* ---------- list scrolling ---------- */
+    els.list.addEventListener('scroll', () => {
+      if (state.rendered >= state.visible.length) return;
+      const { scrollTop, clientHeight, scrollHeight } = els.list;
+      if (scrollTop + clientHeight > scrollHeight - 600) appendRows();
+    });
+
+    /* Keyboard support for the rows (they are divs, not buttons). */
+    els.list.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const row = event.target.closest('.row');
+      if (!row) return;
+      event.preventDefault();
+      playRow(row.dataset.id);
+    });
+
+    els.queueList.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const row = event.target.closest('.q-row');
+      if (!row) return;
+      event.preventDefault();
+      Player.load(row.dataset.qid, { autoplay: true });
+    });
+
+    /* ---------- seek and volume ---------- */
+    U.$$('.seek').forEach((input) => {
+      input.addEventListener('pointerdown', () => {
+        scrubbing = true;
+      });
+      input.addEventListener('input', () => {
+        scrubbing = true;
+        const ratio = Number(input.value) / 1000;
+        input.style.setProperty('--fill', ratio * 100 + '%');
+        Player.seekRatio(ratio);
+      });
+      input.addEventListener('change', () => {
+        scrubbing = false;
+      });
+    });
+    window.addEventListener('pointerup', () => {
+      scrubbing = false;
+    });
+
+    U.$$('.vol').forEach((input) => {
+      input.addEventListener('input', () => {
+        Player.setVolume(Number(input.value) / 100);
+      });
+    });
+
+    /* ---------- now playing ---------- */
+    els.npArt.addEventListener('click', openNowPlaying);
+    els.nowPlaying.addEventListener('click', (event) => {
+      /* Clicking the dark background closes the panel, but never a control. */
+      if (event.target === els.nowPlaying || event.target.classList.contains('np-bg-veil')) {
+        closeNowPlaying();
+      }
+    });
+
+    /* ---------- files ---------- */
+    els.fileInput.addEventListener('change', () => {
+      const files = Array.from(els.fileInput.files || []);
+      els.fileInput.value = '';
+      importFiles(files);
+    });
+
+    els.folderInput.addEventListener('change', () => {
+      const files = Array.from(els.folderInput.files || []);
+      els.folderInput.value = '';
+      importFiles(files);
+    });
+
+    /* ---------- drag and drop ---------- */
+    let dragDepth = 0;
+    const hasFiles = (event) => {
+      const types = event.dataTransfer && event.dataTransfer.types;
+      return types ? Array.from(types).includes('Files') : false;
+    };
+
+    window.addEventListener('dragenter', (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dragDepth += 1;
+      document.body.classList.add('is-dragging');
+    });
+
+    window.addEventListener('dragover', (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    });
+
+    window.addEventListener('dragleave', (event) => {
+      if (!event.dataTransfer) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) document.body.classList.remove('is-dragging');
+    });
+
+    window.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      dragDepth = 0;
+      document.body.classList.remove('is-dragging');
+      if (!event.dataTransfer) return;
+      const files = await filesFromDrop(event.dataTransfer);
+      importFiles(files);
+    });
+
+    /* ---------- queue footer ---------- */
+    els.btnQueueShuffle.addEventListener('click', () => {
+      Player.toggleShuffle();
+      renderQueue();
+    });
+
+    /* ---------- keyboard ---------- */
+    document.addEventListener('keydown', onKeyDown);
+  }
+
+  function onKeyDown(event) {
+    const target = event.target;
+    const typing =
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable);
+
+    if (event.key === 'Escape') {
+      if (els.nowPlaying.classList.contains('is-open')) {
+        closeNowPlaying();
+        return;
+      }
+      if (els.queue.classList.contains('is-open')) {
+        closeQueue();
+        return;
+      }
+      if (els.sidebar.classList.contains('is-open')) {
+        closeSidebar();
+        return;
+      }
+      if (typing && target.blur) target.blur();
+      return;
+    }
+
+    if (typing) return;
+    if (document.querySelector('dialog[open]')) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    /* Space on a focused row is "play that row", handled by the list itself. */
+    if ((event.key === ' ' || event.key === 'Enter') && target.closest && target.closest('.row')) {
+      return;
+    }
+
+    switch (event.key) {
+      case ' ':
+      case 'k':
+      case 'K':
+        event.preventDefault();
+        Player.toggle();
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        Player.seek(Player.audio.currentTime + (event.shiftKey ? 20 : 5));
+        break;
+      case 'ArrowLeft':
+        event.preventDefault();
+        Player.seek(Player.audio.currentTime - (event.shiftKey ? 20 : 5));
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        Player.setVolume(Player.state.volume + 0.05);
+        break;
+      case 'ArrowDown':
+        event.preventDefault();
+        Player.setVolume(Player.state.volume - 0.05);
+        break;
+      case 'm':
+      case 'M':
+        Player.toggleMute();
+        break;
+      case 'n':
+      case 'N':
+        Player.next();
+        break;
+      case 'p':
+      case 'P':
+        Player.prev();
+        break;
+      case 'f':
+      case 'F':
+        toggleFavorite(Player.state.currentId);
+        break;
+      case 's':
+      case 'S':
+        Player.toggleShuffle();
+        break;
+      case 'r':
+      case 'R':
+        Player.cycleRepeat();
+        break;
+      case 'q':
+      case 'Q':
+        toggleQueue();
+        break;
+      case 't':
+      case 'T':
+        toggleTheme();
+        break;
+      case '/':
+        event.preventDefault();
+        els.search.focus();
+        els.search.select();
+        break;
+      case '?':
+        els.helpDialog.showModal();
+        break;
+      default:
+        break;
+    }
+  }
+
+  /* =========================================================
+     Boot
+     ========================================================= */
+  function cache() {
+    els.sidebar = U.$('#sidebar');
+    els.scrim = U.$('#scrim');
+    els.search = U.$('#search');
+    els.searchClear = U.$('#btnClearSearch');
+    els.sort = U.$('#sort');
+    els.list = U.$('#list');
+    els.listHead = U.$('.list-head');
+    els.listFoot = U.$('#listFoot');
+    els.empty = U.$('#empty');
+    els.emptyTitle = U.$('#emptyTitle');
+    els.emptyText = U.$('#emptyText');
+    els.emptyActions = U.$('.empty-actions');
+    els.emptyNote = U.$('.empty-note');
+    els.viewTitle = U.$('#viewTitle');
+    els.viewMeta = U.$('#viewMeta');
+    els.countAll = U.$('#countAll');
+    els.countFav = U.$('#countFav');
+    els.storageText = U.$('#storageText');
+    els.storageFill = U.$('#storageFill');
+    els.npArt = U.$('#npArt');
+    els.npArtInner = U.$('#npArtInner');
+    els.npTitle = U.$('#npTitle');
+    els.npArtist = U.$('#npArtist');
+    els.bigTitle = U.$('#bigTitle');
+    els.bigArtist = U.$('#bigArtist');
+    els.npCoverBigInner = U.$('#npCoverBigInner');
+    els.npBg = U.$('#npBg');
+    els.nowPlaying = U.$('#nowPlaying');
+    els.queue = U.$('#queue');
+    els.queueList = U.$('#queueList');
+    els.queueMeta = U.$('#queueMeta');
+    els.toasts = U.$('#toasts');
+    els.fileInput = U.$('#fileInput');
+    els.folderInput = U.$('#folderInput');
+    els.helpDialog = U.$('#helpDialog');
+    els.confirm = U.$('#confirmDialog');
+    els.confirmTitle = U.$('#confirmTitle');
+    els.confirmText = U.$('#confirmText');
+    els.confirmOk = U.$('#confirmOk');
+    els.confirmCancel = U.$('#confirmCancel');
+    els.viz = U.$('#viz');
+    els.btnMenu = U.$('#btnMenu');
+    els.btnCloseSidebar = U.$('#btnCloseSidebar');
+    els.btnTheme = U.$('#btnTheme');
+    els.btnHelp = U.$('#btnHelp');
+    els.btnClear = U.$('#btnClear');
+    els.btnQueueShuffle = U.$('#btnQueueShuffle');
+  }
+
+  function subscribe() {
+    Player.on('state', () => {
+      renderPlayer();
+      markCurrentRow();
+      renderTime(Player.audio.currentTime, Player.duration);
+    });
+
+    Player.on('track', (track) => {
+      renderPlayer();
+      markCurrentRow();
+      renderTime(0, track ? track.duration : 0);
+    });
+
+    Player.on('time', (info) => {
+      renderTime(info.current, info.duration);
+    });
+
+    Player.on('queue', () => {
+      if (els.queue.classList.contains('is-open')) renderQueue();
+    });
+
+    Player.on('error', (message) => {
+      toast(message, { type: 'error', duration: 4200 });
+    });
+  }
+
+  function init() {
+    cache();
+
+    /* Restore the small preferences before the first paint. */
+    const savedView = U.store.get('view', 'all');
+    state.view = savedView === 'favorites' ? 'favorites' : 'all';
+
+    const savedSort = U.store.get('sort', 'added-desc');
+    state.sort = els.sort.querySelector('option[value="' + savedSort + '"]') ? savedSort : 'added-desc';
+    els.sort.value = state.sort;
+
+    els.scrim.hidden = false;
+    bindEvents();
+    subscribe();
+    renderList();
+    renderPlayer();
+    renderQueue();
+  }
+
+  /** Called by app.js after the library is read from the database. */
+  function afterLibrary() {
+    renderList();
+    renderQueue();
+    renderPlayer();
+    updateHeader();
+    refreshStorage();
+    if (document.documentElement.dataset.theme === 'light') {
+      els.btnTheme.setAttribute('aria-label', 'Switch to dark theme');
+    }
+  }
+
+  window.UI = {
+    state,
+    init,
+    afterLibrary,
+    renderList,
+    renderPlayer,
+    renderQueue,
+    refreshStorage,
+    toast,
+    importFiles,
+    setTheme,
+    visibleIds: () => state.visible.map((track) => track.id),
+  };
+})();

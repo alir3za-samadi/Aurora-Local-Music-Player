@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#08080d">
+  <title>Aurora — local music player</title>
+  <meta name="description" content="A local music player that runs from a single file. Your songs stay in your browser.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M13 22V11l9-1.8v9' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='10.6' cy='22' r='2.6' fill='%23fff'/%3E%3Ccircle cx='19.6' cy='20.2' r='2.6' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- Icon sprite. One copy of each shape, reused with <use>. -->
+<svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.1c0-.9 1-1.5 1.8-1L18.5 10a1.2 1.2 0 0 1 0 2l-8.7 5.9c-.8.5-1.8-.1-1.8-1z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.4" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18.6 6.3v11.4c0 .9-1 1.4-1.7.9L9.6 13a1.2 1.2 0 0 1 0-2l7.3-5.6c.7-.5 1.7 0 1.7.9z" fill="currentColor"/><rect x="5" y="5.5" width="2.3" height="13" rx="1.1" fill="currentColor"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5.4 6.3v11.4c0 .9 1 1.4 1.7.9l7.3-5.6a1.2 1.2 0 0 0 0-2L7.1 5.4c-.7-.5-1.7 0-1.7.9z" fill="currentColor"/><rect x="16.7" y="5.5" width="2.3" height="13" rx="1.1" fill="currentColor"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M3 6h4l10 12h4M3 18h4l10-12h4M18 3l3 3-3 3M18 15l3 3-3 3"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 10V9a3 3 0 0 1 3-3h13M17 3l3 3-3 3M20 14v1a3 3 0 0 1-3 3H4M7 21l-3-3 3-3"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.4 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13z"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13.6A8.6 8.6 0 0 1 10.4 3.5 8.6 8.6 0 1 0 20.5 13.6z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 24 24"><path d="M3 6h13M3 11h13M3 16h7"/><circle cx="17.5" cy="17" r="3"/><path d="M20.5 17V8l2.5-.9"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.8 13h9.4l.8-13M10 11v5M14 11v5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7 14h10"/></symbol>
+</svg>
+
+<div class="app">
+
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-music"/></svg></span>
+      <div class="brand-text">
+        <strong>Aurora</strong>
+        <span>local player</span>
+      </div>
+      <button class="icon-btn close-sidebar" id="btnCloseSidebar" aria-label="Close menu">
+        <svg class="icon"><use href="#i-x"/></svg>
+      </button>
+    </div>
+
+    <nav class="nav" aria-label="Library views">
+      <button class="nav-item is-active" data-view="all">
+        <svg class="icon"><use href="#i-music"/></svg>
+        <span class="nav-label">All songs</span>
+        <span class="nav-count" id="countAll">0</span>
+      </button>
+      <button class="nav-item" data-view="favorites">
+        <svg class="icon"><use href="#i-heart"/></svg>
+        <span class="nav-label">Favorites</span>
+        <span class="nav-count" id="countFav">0</span>
+      </button>
+    </nav>
+
+    <div class="add-block">
+      <button class="btn btn-primary" data-act="addFiles">
+        <svg class="icon"><use href="#i-plus"/></svg>
+        Add music
+      </button>
+      <button class="btn btn-ghost" data-act="addFolder">
+        <svg class="icon"><use href="#i-folder"/></svg>
+        Add folder
+      </button>
+      <p class="hint">Songs are copied into this browser. Nothing is uploaded, and no internet is needed.</p>
+    </div>
+
+    <div class="storage">
+      <div class="storage-head">
+        <span>Browser storage</span>
+        <span id="storageText">—</span>
+      </div>
+      <div class="storage-bar"><i id="storageFill"></i></div>
+    </div>
+
+    <div class="sidebar-foot">
+      <button class="icon-btn" id="btnTheme" aria-label="Switch theme" title="Switch theme (T)">
+        <svg class="icon icon-sun"><use href="#i-sun"/></svg>
+        <svg class="icon icon-moon"><use href="#i-moon"/></svg>
+      </button>
+      <button class="icon-btn" id="btnHelp" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+        <svg class="icon"><use href="#i-keyboard"/></svg>
+      </button>
+      <button class="icon-btn danger" id="btnClear" aria-label="Clear library" title="Clear library">
+        <svg class="icon"><use href="#i-trash"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ Main ============ -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="btnMenu" aria-label="Open menu">
+        <svg class="icon"><use href="#i-menu"/></svg>
+      </button>
+
+      <div class="titles">
+        <h1 id="viewTitle">All songs</h1>
+        <p id="viewMeta">Loading…</p>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="search">
+          <svg class="icon"><use href="#i-search"/></svg>
+          <input id="search" type="search" placeholder="Search songs" autocomplete="off" spellcheck="false" aria-label="Search songs">
+          <kbd class="search-kbd">/</kbd>
+          <button class="search-clear" id="btnClearSearch" aria-label="Clear search" hidden>
+            <svg class="icon"><use href="#i-x"/></svg>
+          </button>
+        </div>
+
+        <label class="sort">
+          <span class="sort-label">Sort</span>
+          <select id="sort" aria-label="Sort songs">
+            <option value="added-desc">Newest first</option>
+            <option value="added-asc">Oldest first</option>
+            <option value="title-asc">Title A–Z</option>
+            <option value="title-desc">Title Z–A</option>
+            <option value="artist-asc">Artist A–Z</option>
+            <option value="album-asc">Album A–Z</option>
+            <option value="duration-asc">Shortest first</option>
+            <option value="duration-desc">Longest first</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <div class="list-wrap" id="listWrap">
+      <div class="list-head" aria-hidden="true">
+        <span class="c-idx">#</span>
+        <span>Title</span>
+        <span class="c-album">Album</span>
+        <span class="c-time">Time</span>
+        <span class="c-actions"></span>
+      </div>
+
+      <div class="list" id="list" role="listbox" aria-label="Tracks" tabindex="-1"></div>
+
+      <div class="empty" id="empty" hidden>
+        <div class="empty-art" aria-hidden="true">
+          <svg class="icon"><use href="#i-music"/></svg>
+        </div>
+        <h2 id="emptyTitle">Your library is empty</h2>
+        <p id="emptyText">Drop your audio files anywhere on this page.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" data-act="addFiles">
+            <svg class="icon"><use href="#i-plus"/></svg>
+            Add music
+          </button>
+          <button class="btn btn-ghost" data-act="addFolder">
+            <svg class="icon"><use href="#i-folder"/></svg>
+            Add folder
+          </button>
+        </div>
+        <p class="empty-note">MP3 · FLAC · M4A · WAV · OGG · OPUS</p>
+      </div>
+
+      <div class="list-foot" id="listFoot" hidden></div>
+    </div>
+  </main>
+
+  <!-- ============ Player bar ============ -->
+  <footer class="player" id="playerBar">
+    <div class="np">
+      <button class="np-art" id="npArt" aria-label="Open now playing view">
+        <span class="np-art-inner" id="npArtInner"><svg class="icon"><use href="#i-music"/></svg></span>
+        <span class="np-art-expand"><svg class="icon"><use href="#i-expand"/></svg></span>
+      </button>
+      <div class="np-text">
+        <div class="np-title" id="npTitle">Nothing playing</div>
+        <div class="np-artist" id="npArtist">Add songs to begin</div>
+      </div>
+      <button class="icon-btn fav-btn" data-act="favorite" aria-label="Add to favorites" aria-pressed="false">
+        <svg class="icon"><use href="#i-heart"/></svg>
+      </button>
+    </div>
+
+    <div class="controls">
+      <div class="controls-row">
+        <button class="icon-btn" data-act="shuffle" aria-label="Shuffle" aria-pressed="false" title="Shuffle (S)">
+          <svg class="icon"><use href="#i-shuffle"/></svg>
+        </button>
+        <button class="icon-btn" data-act="prev" aria-label="Previous track" title="Previous (P)">
+          <svg class="icon"><use href="#i-prev"/></svg>
+        </button>
+        <button class="play-btn" data-act="togglePlay" aria-label="Play" title="Play / pause (Space)">
+          <svg class="icon js-icon-play"><use href="#i-play"/></svg>
+        </button>
+        <button class="icon-btn" data-act="next" aria-label="Next track" title="Next (N)">
+          <svg class="icon"><use href="#i-next"/></svg>
+        </button>
+        <button class="icon-btn repeat-btn" data-act="repeat" aria-label="Repeat: off" aria-pressed="false" title="Repeat (R)">
+          <svg class="icon"><use href="#i-repeat"/></svg>
+          <span class="repeat-badge" aria-hidden="true">1</span>
+        </button>
+      </div>
+
+      <div class="seek-row">
+        <span class="time" data-role="timeCur">0:00</span>
+        <input class="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek" aria-valuetext="0:00">
+        <span class="time" data-role="timeDur">0:00</span>
+      </div>
+    </div>
+
+    <div class="extra">
+      <button class="btn-tiny" data-act="speed" aria-label="Playback speed" title="Playback speed">1×</button>
+      <div class="volume">
+        <button class="icon-btn" data-act="mute" aria-label="Mute" title="Mute (M)">
+          <svg class="icon js-icon-vol"><use href="#i-volume"/></svg>
+        </button>
+        <input class="vol" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
+      </div>
+      <button class="icon-btn" data-act="queue" aria-label="Queue" title="Queue (Q)">
+        <svg class="icon"><use href="#i-queue"/></svg>
+      </button>
+    </div>
+  </footer>
+
+  <!-- On phones the sidebar is a drawer. This scrim sits inside .app so the
+       drawer itself stays above it. -->
+  <div class="scrim scrim-sidebar" id="scrimSidebar"></div>
+</div>
+
+<!-- ============ Now playing (full view) ============ -->
+<section class="now-playing" id="nowPlaying" aria-hidden="true" aria-label="Now playing">
+  <div class="np-bg" id="npBg"></div>
+  <div class="np-bg-veil"></div>
+
+  <div class="np-shell">
+    <header class="np-head">
+      <button class="icon-btn" data-close="nowPlaying" aria-label="Close now playing">
+        <svg class="icon"><use href="#i-x"/></svg>
+      </button>
+      <span class="np-kicker">Now playing</span>
+      <button class="icon-btn" data-act="queue" aria-label="Queue">
+        <svg class="icon"><use href="#i-queue"/></svg>
+      </button>
+    </header>
+
+    <div class="np-body">
+      <div class="np-cover" id="npCoverBig">
+        <div class="np-cover-inner" id="npCoverBigInner"><svg class="icon"><use href="#i-music"/></svg></div>
+      </div>
+
+      <div class="np-info">
+        <div class="np-titles">
+          <h2 id="bigTitle">Nothing playing</h2>
+          <p id="bigArtist">Pick a song from your library</p>
+        </div>
+
+        <canvas class="viz" id="viz" width="640" height="120" aria-hidden="true"></canvas>
+
+        <div class="np-seek">
+          <input class="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek" aria-valuetext="0:00">
+          <div class="np-times">
+            <span data-role="timeCur">0:00</span>
+            <span data-role="timeDur">0:00</span>
+          </div>
+        </div>
+
+        <div class="np-controls">
+          <button class="icon-btn" data-act="shuffle" aria-label="Shuffle" aria-pressed="false">
+            <svg class="icon"><use href="#i-shuffle"/></svg>
+          </button>
+          <button class="icon-btn" data-act="prev" aria-label="Previous track">
+            <svg class="icon"><use href="#i-prev"/></svg>
+          </button>
+          <button class="play-btn big" data-act="togglePlay" aria-label="Play">
+            <svg class="icon js-icon-play"><use href="#i-play"/></svg>
+          </button>
+          <button class="icon-btn" data-act="next" aria-label="Next track">
+            <svg class="icon"><use href="#i-next"/></svg>
+          </button>
+          <button class="icon-btn repeat-btn" data-act="repeat" aria-label="Repeat: off" aria-pressed="false">
+            <svg class="icon"><use href="#i-repeat"/></svg>
+            <span class="repeat-badge" aria-hidden="true">1</span>
+          </button>
+        </div>
+
+        <div class="np-extra">
+          <button class="icon-btn fav-btn" data-act="favorite" aria-label="Add to favorites" aria-pressed="false">
+            <svg class="icon"><use href="#i-heart"/></svg>
+          </button>
+          <button class="btn-tiny" data-act="speed" aria-label="Playback speed">1×</button>
+          <div class="volume">
+            <button class="icon-btn" data-act="mute" aria-label="Mute">
+              <svg class="icon js-icon-vol"><use href="#i-volume"/></svg>
+            </button>
+            <input class="vol" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Queue drawer ============ -->
+<aside class="queue" id="queue" aria-hidden="true" aria-label="Play queue">
+  <header class="queue-head">
+    <div>
+      <h2>Queue</h2>
+      <p id="queueMeta">0 songs</p>
+    </div>
+    <button class="icon-btn" data-close="queue" aria-label="Close queue">
+      <svg class="icon"><use href="#i-x"/></svg>
+    </button>
+  </header>
+  <div class="queue-list" id="queueList"></div>
+  <footer class="queue-foot">
+    <button class="btn btn-ghost" id="btnQueueShuffle">
+      <svg class="icon"><use href="#i-shuffle"/></svg>
+      Shuffle queue
+    </button>
+  </footer>
+</aside>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<!-- ============ Drop overlay ============ -->
+<div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+  <div class="drop-box">
+    <svg class="icon"><use href="#i-plus"/></svg>
+    <strong>Drop to add</strong>
+    <span>Songs and folders are welcome</span>
+  </div>
+</div>
+
+<!-- ============ Dialogs ============ -->
+<dialog class="dialog" id="helpDialog" aria-labelledby="helpTitle">
+  <h2 id="helpTitle">Keyboard shortcuts</h2>
+  <dl class="shortcuts">
+    <div><dt><kbd>Space</kbd> / <kbd>K</kbd></dt><dd>Play or pause</dd></div>
+    <div><dt><kbd>N</kbd> / <kbd>P</kbd></dt><dd>Next / previous song</dd></div>
+    <div><dt><kbd>←</kbd> / <kbd>→</kbd></dt><dd>Seek 5 seconds (hold Shift for 20)</dd></div>
+    <div><dt><kbd>↑</kbd> / <kbd>↓</kbd></dt><dd>Volume up / down</dd></div>
+    <div><dt><kbd>M</kbd></dt><dd>Mute</dd></div>
+    <div><dt><kbd>F</kbd></dt><dd>Favorite current song</dd></div>
+    <div><dt><kbd>S</kbd> / <kbd>R</kbd></dt><dd>Shuffle / repeat mode</dd></div>
+    <div><dt><kbd>Q</kbd></dt><dd>Open the queue</dd></div>
+    <div><dt><kbd>/</kbd></dt><dd>Focus search</dd></div>
+    <div><dt><kbd>T</kbd></dt><dd>Switch theme</dd></div>
+    <div><dt><kbd>Esc</kbd></dt><dd>Close panel or dialog</dd></div>
+  </dl>
+  <div class="dialog-actions">
+    <button class="btn btn-ghost" data-close-dialog>Close</button>
+  </div>
+</dialog>
+
+<dialog class="dialog" id="confirmDialog" aria-labelledby="confirmTitle">
+  <h2 id="confirmTitle">Are you sure?</h2>
+  <p class="dialog-text" id="confirmText"></p>
+  <div class="dialog-actions">
+    <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
+    <button class="btn btn-danger" id="confirmOk">Delete</button>
+  </div>
+</dialog>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<input type="file" id="fileInput" accept="audio/*,.mp3,.flac,.m4a,.mp4,.aac,.wav,.ogg,.oga,.opus,.webm" multiple hidden>
+<input type="file" id="folderInput" webkitdirectory multiple hidden>
+
+<noscript>
+  <div class="noscript">This player needs JavaScript to run.</div>
+</noscript>
+
+<script src="js/util.js"></script>
+<script src="js/db.js"></script>
+<script src="js/tags.js"></script>
+<script src="js/player.js"></script>
+<script src="js/library.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
