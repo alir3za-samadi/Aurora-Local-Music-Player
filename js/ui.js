@@ -130,6 +130,11 @@
   }
 
   function renderList(preserveScroll) {
+    if (state.view === 'queue') {
+      renderQueueView();
+      return;
+    }
+
     const previousTop = preserveScroll ? els.list.scrollTop : 0;
     const previousCount = state.rendered;
 
@@ -152,6 +157,26 @@
   }
 
   function updateHeader() {
+    const countQueue = U.$('#countQueue');
+    if (countQueue) countQueue.textContent = String(Player.state.queue.length);
+
+    if (state.view === 'queue') {
+      els.viewTitle.textContent = 'Playing queue';
+      const total = Player.state.queue.length;
+      const parts = [];
+      if (total === 0) parts.push('No songs in the queue');
+      else parts.push(total + (total === 1 ? ' song' : ' songs'));
+      const duration = Player.state.queue.reduce((sum, id) => {
+        const t = Library.byId.get(id);
+        return sum + (t ? t.duration || 0 : 0);
+      }, 0);
+      if (duration > 0) parts.push(U.fmtTime(duration));
+      els.viewMeta.textContent = parts.join(' · ');
+      els.countAll.textContent = String(Library.count('all'));
+      els.countFav.textContent = String(Library.count('favorites'));
+      return;
+    }
+
     const total = Library.count(state.view);
     const shown = state.visible.length;
 
@@ -202,6 +227,11 @@
       els.emptyText.textContent = 'Press the heart next to a song to keep it here.';
       els.emptyActions.hidden = true;
       els.emptyNote.hidden = true;
+    } else if (state.view === 'queue') {
+      els.emptyTitle.textContent = 'The queue is empty';
+      els.emptyText.textContent = 'Play a song to fill it.';
+      els.emptyActions.hidden = true;
+      els.emptyNote.hidden = true;
     } else {
       els.emptyTitle.textContent = 'Nothing here';
       els.emptyText.textContent = 'Try another view.';
@@ -219,6 +249,12 @@
       row.classList.toggle('is-current', isCurrent);
       row.classList.toggle('is-playing', isCurrent && playing);
       row.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+    });
+
+    U.$$('.q-row').forEach((row) => {
+      const isCurrent = row.dataset.qid === currentId;
+      row.classList.toggle('is-current', isCurrent);
+      row.classList.toggle('is-playing', isCurrent && playing);
     });
   }
 
@@ -285,6 +321,18 @@
     document.body.dataset.repeat = Player.state.repeat;
   }
 
+  function placeVolPct(input) {
+    const label = input.parentElement.querySelector('.vol-pct');
+    if (!label) return;
+    const min = Number(input.min) || 0;
+    const max = Number(input.max) || 100;
+    const value = Number(input.value);
+    const thumb = 11;
+    const usable = input.clientWidth - thumb;
+    const x = thumb / 2 + ((value - min) / (max - min || 1)) * usable;
+    label.style.left = (Number.isFinite(x) ? x : 0) + 'px';
+  }
+
   function renderVolume() {
     const percent = Player.state.muted ? 0 : Math.round(Player.state.volume * 100);
 
@@ -304,9 +352,12 @@
       button.classList.toggle('is-on', muted);
     });
 
-    /* The number that appears while the pointer is over the slider. */
     U.$$('.vol-pct').forEach((label) => {
       label.textContent = percent + '%';
+    });
+
+    requestAnimationFrame(() => {
+      U.$$('.vol').forEach((input) => placeVolPct(input));
     });
   }
 
@@ -369,6 +420,8 @@
     const queue = Player.state.queue;
     els.queueMeta.textContent = queue.length + (queue.length === 1 ? ' song' : ' songs');
     els.queueList.textContent = '';
+    const countQueue = U.$('#countQueue');
+    if (countQueue) countQueue.textContent = String(queue.length);
 
     if (!queue.length) {
       els.queueList.appendChild(
@@ -380,39 +433,131 @@
     const fragment = document.createDocumentFragment();
 
     queue.forEach((id) => {
-      const track = Library.byId.get(id);
-      if (!track) return;
-
-      const isCurrent = id === Player.state.currentId;
-
-      const row = U.el('div', {
-        class: 'q-row' + (isCurrent ? ' is-current' : ''),
-        dataset: { qid: id },
-        role: 'button',
-        tabindex: '0',
-        'aria-label': 'Play ' + track.title,
-      });
-
-      row.appendChild(thumbNode(track, 'q-thumb'));
-      row.appendChild(U.el('div', { class: 'q-text' }, [U.el('div', { class: 'q-title', text: track.title })]));
-      row.appendChild(U.el('span', { class: 'q-time', text: U.fmtTime(track.duration) }));
-      row.appendChild(
-        U.el(
-          'button',
-          {
-            class: 'icon-btn',
-            dataset: { rowAction: 'qremove', id: track.id },
-            'aria-label': 'Remove from queue',
-            title: 'Remove from queue',
-          },
-          [U.icon('x')]
-        )
-      );
-
-      fragment.appendChild(row);
+      const row = queueRowFor(id);
+      if (row) fragment.appendChild(row);
     });
 
     els.queueList.appendChild(fragment);
+  }
+
+  function renderQueueView() {
+    const queue = Player.state.queue;
+    const countQueue = U.$('#countQueue');
+    if (countQueue) countQueue.textContent = String(queue.length);
+    els.countAll.textContent = String(Library.count('all'));
+    els.countFav.textContent = String(Library.count('favorites'));
+
+    els.list.textContent = '';
+    els.listHead.hidden = true;
+    els.list.hidden = queue.length === 0;
+    els.empty.hidden = queue.length > 0;
+
+    if (!queue.length) {
+      els.emptyTitle.textContent = 'The queue is empty';
+      els.emptyText.textContent = 'Play a song to fill it.';
+      els.emptyActions.hidden = true;
+      els.emptyNote.hidden = true;
+      updateNav();
+      updateHeader();
+      return;
+    }
+
+    els.emptyTitle.textContent = 'Nothing here';
+    els.emptyText.textContent = 'Try another view.';
+    els.emptyActions.hidden = true;
+    els.emptyNote.hidden = true;
+
+    const fragment = document.createDocumentFragment();
+    queue.forEach((id) => {
+      const row = queueRowFor(id);
+      if (row) fragment.appendChild(row);
+    });
+    els.list.appendChild(fragment);
+
+    const foot = U.el('div', { class: 'queue-view-foot' }, [
+      U.el('button', { class: 'btn btn-ghost', dataset: { act: 'shuffleQueue' }, 'aria-label': 'Shuffle queue' }, [U.icon('shuffle'), 'Shuffle queue']),
+    ]);
+    els.list.appendChild(foot);
+
+    updateNav();
+    updateHeader();
+  }
+
+  /** Build one queue row. Used by the drawer and by the Playing queue view. */
+  function queueRowFor(id) {
+    const track = Library.byId.get(id);
+    if (!track) return null;
+    const isCurrent = id === Player.state.currentId;
+    const row = U.el('div', {
+      class: 'q-row' + (isCurrent ? ' is-current' : ''),
+      dataset: { qid: id },
+      role: 'button',
+      tabindex: '0',
+      'aria-label': 'Play ' + track.title,
+    });
+    const handle = U.el('button', { class: 'q-drag', 'aria-label': 'Reorder in queue', title: 'Drag to reorder', dataset: { drag: 'true' } }, [U.icon('i-grip')]);
+    handle.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      event.preventDefault();
+      const list = row.parentElement;
+      if (!list) return;
+      const rows = Array.from(list.querySelectorAll('.q-row'));
+      const index = rows.indexOf(row);
+      const target = event.key === 'ArrowUp' ? index - 1 : index + 1;
+      if (target < 0 || target >= rows.length) return;
+      if (event.key === 'ArrowUp') list.insertBefore(row, rows[target]);
+      else list.insertBefore(rows[target], row);
+      applyQueueOrder(list);
+      handle.focus();
+    });
+    row.appendChild(handle);
+    row.appendChild(thumbNode(track, 'q-thumb'));
+    row.appendChild(U.el('div', { class: 'q-text' }, [U.el('div', { class: 'q-title', text: track.title })]));
+    row.appendChild(U.el('span', { class: 'q-time', text: U.fmtTime(track.duration) }));
+    row.appendChild(U.el('button', { class: 'icon-btn', dataset: { rowAction: 'qremove', id: track.id }, 'aria-label': 'Remove from queue', title: 'Remove from queue' }, [U.icon('x')]));
+    return row;
+  }
+
+  function applyQueueOrder(list) {
+    const ids = Array.from(list.querySelectorAll('.q-row')).map((row) => row.dataset.qid);
+    if (!ids.length) return;
+    Player.setQueue(ids);
+  }
+
+  function startQueueDrag(event) {
+    const handle = event.target && event.target.closest && event.target.closest('[data-drag]');
+    if (!handle) return;
+    const row = handle.closest('.q-row');
+    if (!row) return;
+    const list = row.parentElement;
+    if (!list) return;
+
+    const initialOrder = Array.from(list.querySelectorAll('.q-row')).map((r) => r.dataset.qid).join('|');
+
+    event.preventDefault();
+    try { handle.setPointerCapture(event.pointerId); } catch (e) { /* ignore */ }
+    row.classList.add('is-dragging');
+
+    const move = (pointerEvent) => {
+      const siblings = Array.from(list.querySelectorAll('.q-row')).filter((item) => item !== row);
+      const target = siblings.find((item) => {
+        const box = item.getBoundingClientRect();
+        return pointerEvent.clientY < box.top + box.height / 2;
+      });
+      if (target) list.insertBefore(row, target);
+      else list.appendChild(row);
+    };
+    const end = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      row.classList.remove('is-dragging');
+      const newOrder = Array.from(list.querySelectorAll('.q-row')).map((r) => r.dataset.qid).join('|');
+      if (newOrder !== initialOrder) applyQueueOrder(list);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
   }
 
   /* =========================================================
@@ -629,9 +774,9 @@
   }
 
   async function toggleFavorite(id) {
-    if (!id) return;
+    if (!id) return null;
     const value = await Library.toggleFavorite(id);
-    if (value === null) return;
+    if (value === null) return null;
 
     if (state.view === 'favorites') {
       renderList(true);
@@ -649,6 +794,8 @@
     }
 
     if (Player.state.currentId === id) renderPlayer();
+    toast(value ? 'Added “' + (Library.byId.get(id) && Library.byId.get(id).title) + '” to favorites' : 'Removed from favorites');
+    return value;
   }
 
   /* =========================================================
@@ -682,9 +829,14 @@
     const menu = els.ctxMenu;
     menu.textContent = '';
 
-    menu.appendChild(contextItem('Play next', () => Player.playNext(id)));
+    menu.appendChild(contextItem('Play next', () => {
+      Player.playNext(id);
+      toast('“' + track.title + '” will play next');
+    }));
     menu.appendChild(
-      contextItem(track.favorite ? 'Remove from favorites' : 'Add to favorites', () => toggleFavorite(id))
+      contextItem(track.favorite ? 'Remove from favorites' : 'Add to favorites', async () => {
+        await toggleFavorite(id);
+      })
     );
     menu.appendChild(U.el('hr'));
     menu.appendChild(
@@ -693,17 +845,17 @@
             Player.removeFromQueue(id);
             renderQueue();
             markCurrentRow();
+            toast('Removed “' + track.title + '” from the queue');
           })
         : contextItem('Remove from library', () => removeTrack(id))
     );
 
-    /* Keep the menu inside the window. */
-    const rect = event.target.getBoundingClientRect();
+    /* Place the menu at the exact click point, and keep it on screen. */
     menu.hidden = false;
     const width = menu.offsetWidth;
     const height = menu.offsetHeight;
-    const left = Math.min(rect.left, window.innerWidth - width - 8);
-    const top = Math.min(event.clientY || rect.top, window.innerHeight - height - 8);
+    const left = Math.min(event.clientX + 4, window.innerWidth - width - 8);
+    const top = Math.min(event.clientY + 4, window.innerHeight - height - 8);
     menu.style.left = Math.max(8, left) + 'px';
     menu.style.top = Math.max(8, top) + 'px';
 
@@ -931,8 +1083,11 @@
 
   function setView(view) {
     if (state.view === view) return;
-    state.view = view;
-    U.store.set('view', view);
+    state.view = view === 'favorites' || view === 'queue' ? view : 'all';
+    if (view === 'all' || view === 'favorites') U.store.set('view', state.view);
+    state.search = '';
+    els.search.value = '';
+    els.searchClear.hidden = true;
     renderList();
   }
 
@@ -969,6 +1124,11 @@
         break;
       case 'shuffle':
         Player.toggleShuffle();
+        break;
+      case 'shuffleQueue':
+        Player.toggleShuffle();
+        renderQueue();
+        if (state.view === 'queue') renderQueueView();
         break;
       case 'repeat':
         Player.cycleRepeat();
@@ -1044,6 +1204,11 @@
 
       const row = target.closest && target.closest('.row');
       if (row) playRow(row.dataset.id);
+    });
+
+    /* Dragging a queue row reorders the play order. */
+    document.addEventListener('pointerdown', (event) => {
+      startQueueDrag(event);
     });
 
     /* Right-click opens the song menu, in the list and in the queue drawer. */
@@ -1160,20 +1325,21 @@
       input.addEventListener('input', () => {
         const val = Number(input.value);
         Player.setVolume(val / 100);
-        if (volPct) volPct.textContent = val + '%';
+        placeVolPct(input);
+      });
+      input.addEventListener('pointerdown', () => {
+        if (input.parentElement) input.parentElement.classList.add('is-dragging');
+      });
+      window.addEventListener('pointerup', () => {
+        if (input.parentElement) input.parentElement.classList.remove('is-dragging');
       });
       input.addEventListener('pointerenter', () => {
-        if (volPct) volPct.style.opacity = '1';
+        if (volPct) volPct.classList.add('is-visible');
       });
       input.addEventListener('pointerleave', () => {
-        if (volPct) volPct.style.opacity = '0';
+        if (volPct) volPct.classList.remove('is-visible');
       });
-      /* Initialize */
-      if (volPct) {
-        volPct.textContent = input.value + '%';
-        volPct.style.opacity = '0';
-        volPct.style.transition = 'opacity 0.15s var(--ease)';
-      }
+      placeVolPct(input);
     });
 
     /* ---------- now playing ---------- */
@@ -1372,6 +1538,7 @@
     els.viewMeta = U.$('#viewMeta');
     els.countAll = U.$('#countAll');
     els.countFav = U.$('#countFav');
+    els.countQueue = U.$('#countQueue');
     els.storageText = U.$('#storageText');
     els.storageFill = U.$('#storageFill');
     els.npArt = U.$('#npArt');
@@ -1422,6 +1589,7 @@
 
     Player.on('queue', () => {
       if (els.queue.classList.contains('is-open')) renderQueue();
+      if (state.view === 'queue') renderQueueView();
     });
 
     Player.on('error', (message) => {

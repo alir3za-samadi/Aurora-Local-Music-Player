@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#08080d">
-  <title>Aurora — local music player</title>
-  <meta name="description" content="A local music player that runs from a single file. Your songs stay in your browser.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M13 22V11l9-1.8v9' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='10.6' cy='22' r='2.6' fill='%23fff'/%3E%3Ccircle cx='19.6' cy='20.2' r='2.6' fill='%23fff'/%3E%3C/svg%3E">
+  <title>Aurora</title>
+  <meta name="description" content="Aurora | Local music Player">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c4dd9'/%3E%3Cstop offset='1' stop-color='%2318a9c5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M13 22V11l9-1.8v9' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='10.6' cy='22' r='2.6' fill='%23fff'/%3E%3Ccircle cx='19.6' cy='20.2' r='2.6' fill='%23fff'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -34,14 +34,14 @@
   <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
   <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
   <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
-  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7 14h10"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3" fill="currentColor"/><circle cx="15" cy="6" r="1.3" fill="currentColor"/><circle cx="9" cy="12" r="1.3" fill="currentColor"/><circle cx="15" cy="12" r="1.3" fill="currentColor"/><circle cx="9" cy="18" r="1.3" fill="currentColor"/><circle cx="15" cy="18" r="1.3" fill="currentColor"/></symbol>
 </svg>
 
 <div class="app">
 
   <!-- ============ Sidebar ============ -->
   <aside class="sidebar" id="sidebar">
-    <div class="brand">
+    <div class="brand" title="Aurora | Local music Player">
       <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-music"/></svg></span>
       <div class="brand-text">
         <strong>Aurora</strong>
@@ -62,6 +62,11 @@
         <svg class="icon"><use href="#i-heart"/></svg>
         <span class="nav-label">Favorites</span>
         <span class="nav-count" id="countFav">0</span>
+      </button>
+      <button class="nav-item" data-view="queue">
+        <svg class="icon"><use href="#i-queue"/></svg>
+        <span class="nav-label">Playing queue</span>
+        <span class="nav-count" id="countQueue">0</span>
       </button>
     </nav>
 

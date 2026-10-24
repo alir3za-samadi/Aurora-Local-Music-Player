@@ -453,6 +453,22 @@
     if (changed) emit('queue');
   }
 
+  /** Move one song to a new place in the queue. Never duplicates it. */
+  function moveInQueue(id, toIndex) {
+    const from = state.queue.indexOf(id);
+    if (from < 0) return false;
+    const to = Math.max(0, Math.min(state.queue.length - 1, toIndex));
+    if (from === to) return false;
+
+    state.queue.splice(from, 1);
+    state.queue.splice(to, 0, id);
+
+    if (!state.order.includes(id)) state.order.push(id);
+    if (state.currentId) state.pos = state.queue.indexOf(state.currentId);
+    emit('queue');
+    return true;
+  }
+
   /**
    * Put one song right after the song that is playing now.
    * If it is already in the queue it moves, it is not duplicated.
@@ -575,6 +591,7 @@
     removeFromQueue,
     appendToQueue,
     playNext,
+    moveInQueue,
     stop,
     artFor: loadArt,
     ensureGraph,
