@@ -35,8 +35,14 @@ original files on disk are never changed, moved, or deleted.
 - 🎚️ **Now playing** — click the cover in the player bar for a full view with a live
   audio visualizer.
 - ⏩ **Playback speed** — a drop-down with 0.5x, 0.75x, 1x, 1.25x, 1.5x, and 2x.
-- 🔊 **Volume read-out** — the exact percentage appears while the pointer is over the
-  volume slider.
+- 🔊 **Volume read-out** — the exact percentage appears above the slider knob while the
+  pointer is over it, and follows the knob while dragging.
+- 🅰️ **Vazirmatn font** — Persian and Arabic text render correctly. The font ships
+  with the app, so it works offline.
+- 🗂️ **Playing queue view** — a third sidebar tab shows the play order, with drag
+  handles to reorder it.
+- 🔀 **Drag to reorder** — grab the grip on a queue row (or press Arrow Up / Down on
+  it) to change the play order. Works in the queue drawer too.
 - ⌨️ **Media keys** — the play, pause, next, and previous keys on your keyboard work.
   The song name also shows in the system media panel.
 - 🌗 **Themes** — dark and light. The app follows your system theme on the first run.

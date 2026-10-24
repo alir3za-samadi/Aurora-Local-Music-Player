@@ -182,6 +182,17 @@ The queue is also written to localStorage, so a reload continues in the same ord
 - **The cover placeholder is a plain gradient.** `thumbNode` and `placeholder` only set
   `--hue`; the two colors come from the `--grad-*` tokens. Never put text, initials, or
   an icon inside a cover.
+- **The Playing queue view is a third view.** `state.view === 'queue'` renders the
+  queue rows inside `#list`, with a shuffle footer. `renderList` returns early for it,
+  and `updateHeader` / `updateEmpty` have branches for it. Search and sort are hidden
+  in that view.
+- **Queue rows can be reordered.** The grip button (`.q-drag`) drives `startQueueDrag`
+  with pointer events; Arrow Up / Down on the grip moves one step. Both paths end in
+  `applyQueueOrder`, which calls `Player.setQueue(ids)`. Only reorder when the order
+  actually changed.
+- **Fonts are self-hosted.** Inter covers Latin; Vazirmatn (variable woff2) covers the
+  Arabic block via `unicode-range`. Add a new script only if the user asks; the
+  `--font` stack is the single place to change the order.
 - **Icons are one SVG sprite** at the top of `index.html`. Use
   `U.icon('i-play')` or `<svg class="icon"><use href="#i-play"/></svg>`. Do not add an
   icon file.
