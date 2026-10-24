@@ -126,10 +126,8 @@
           <select id="sort" aria-label="Sort songs">
             <option value="added-desc">Newest first</option>
             <option value="added-asc">Oldest first</option>
-            <option value="title-asc">Title A–Z</option>
-            <option value="title-desc">Title Z–A</option>
-            <option value="artist-asc">Artist A–Z</option>
-            <option value="album-asc">Album A–Z</option>
+            <option value="title-asc">Name A–Z</option>
+            <option value="title-desc">Name Z–A</option>
             <option value="duration-asc">Shortest first</option>
             <option value="duration-desc">Longest first</option>
           </select>
@@ -140,8 +138,7 @@
     <div class="list-wrap" id="listWrap">
       <div class="list-head" aria-hidden="true">
         <span class="c-idx">#</span>
-        <span>Title</span>
-        <span class="c-album">Album</span>
+        <span>Name</span>
         <span class="c-time">Time</span>
         <span class="c-actions"></span>
       </div>
@@ -166,8 +163,6 @@
         </div>
         <p class="empty-note">MP3 · FLAC · M4A · WAV · OGG · OPUS</p>
       </div>
-
-      <div class="list-foot" id="listFoot" hidden></div>
     </div>
   </main>
 
@@ -175,12 +170,11 @@
   <footer class="player" id="playerBar">
     <div class="np">
       <button class="np-art" id="npArt" aria-label="Open now playing view">
-        <span class="np-art-inner" id="npArtInner"><svg class="icon"><use href="#i-music"/></svg></span>
+        <span class="np-art-inner placeholder" id="npArtInner"></span>
         <span class="np-art-expand"><svg class="icon"><use href="#i-expand"/></svg></span>
       </button>
       <div class="np-text">
         <div class="np-title" id="npTitle">Nothing playing</div>
-        <div class="np-artist" id="npArtist">Add songs to begin</div>
       </div>
       <button class="icon-btn fav-btn" data-act="favorite" aria-label="Add to favorites" aria-pressed="false">
         <svg class="icon"><use href="#i-heart"/></svg>
@@ -215,11 +209,21 @@
     </div>
 
     <div class="extra">
-      <button class="btn-tiny" data-act="speed" aria-label="Playback speed" title="Playback speed">1×</button>
+      <label class="speed">
+        <select class="speed-select" aria-label="Playback speed">
+          <option value="0.5">0.5×</option>
+          <option value="0.75">0.75×</option>
+          <option value="1">1×</option>
+          <option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option>
+          <option value="2">2×</option>
+        </select>
+      </label>
       <div class="volume">
         <button class="icon-btn" data-act="mute" aria-label="Mute" title="Mute (M)">
           <svg class="icon js-icon-vol"><use href="#i-volume"/></svg>
         </button>
+        <span class="vol-pct" aria-hidden="true">100%</span>
         <input class="vol" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
       </div>
       <button class="icon-btn" data-act="queue" aria-label="Queue" title="Queue (Q)">
@@ -227,6 +231,9 @@
       </button>
     </div>
   </footer>
+
+  <!-- Right-click menu for a song. Its items are built in ui.js. -->
+  <div class="ctx-menu" id="ctxMenu" role="menu" aria-label="Song actions" hidden></div>
 
   <!-- On phones the sidebar is a drawer. This scrim sits inside .app so the
        drawer itself stays above it. -->
@@ -251,13 +258,12 @@
 
     <div class="np-body">
       <div class="np-cover" id="npCoverBig">
-        <div class="np-cover-inner" id="npCoverBigInner"><svg class="icon"><use href="#i-music"/></svg></div>
+        <div class="np-cover-inner placeholder" id="npCoverBigInner"></div>
       </div>
 
       <div class="np-info">
         <div class="np-titles">
           <h2 id="bigTitle">Nothing playing</h2>
-          <p id="bigArtist">Pick a song from your library</p>
         </div>
 
         <canvas class="viz" id="viz" width="640" height="120" aria-hidden="true"></canvas>
@@ -293,11 +299,21 @@
           <button class="icon-btn fav-btn" data-act="favorite" aria-label="Add to favorites" aria-pressed="false">
             <svg class="icon"><use href="#i-heart"/></svg>
           </button>
-          <button class="btn-tiny" data-act="speed" aria-label="Playback speed">1×</button>
+          <label class="speed">
+            <select class="speed-select" aria-label="Playback speed">
+              <option value="0.5">0.5×</option>
+              <option value="0.75">0.75×</option>
+              <option value="1">1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </label>
           <div class="volume">
             <button class="icon-btn" data-act="mute" aria-label="Mute">
               <svg class="icon js-icon-vol"><use href="#i-volume"/></svg>
             </button>
+            <span class="vol-pct" aria-hidden="true">100%</span>
             <input class="vol" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
           </div>
         </div>
@@ -349,6 +365,7 @@
     <div><dt><kbd>F</kbd></dt><dd>Favorite current song</dd></div>
     <div><dt><kbd>S</kbd> / <kbd>R</kbd></dt><dd>Shuffle / repeat mode</dd></div>
     <div><dt><kbd>Q</kbd></dt><dd>Open the queue</dd></div>
+    <div><dt>Right-click</dt><dd>Open the song menu (play next, favorite, remove)</dd></div>
     <div><dt><kbd>/</kbd></dt><dd>Focus search</dd></div>
     <div><dt><kbd>T</kbd></dt><dd>Switch theme</dd></div>
     <div><dt><kbd>Esc</kbd></dt><dd>Close panel or dialog</dd></div>

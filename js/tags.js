@@ -130,7 +130,6 @@
     while (p < end) {
       let id;
       let size;
-      let frameFlags = 0;
 
       if (major === 2) {
         id = ascii(u8, p, p + 3);
@@ -141,7 +140,6 @@
         id = ascii(u8, p, p + 4);
         if (!/^[A-Z0-9]{4}$/.test(id)) break;
         size = major === 4 ? syncsafe(u8, p + 4) : u32be(u8, p + 4);
-        frameFlags = (u8[p + 8] << 8) | u8[p + 9];
         p += 10;
       }
 
@@ -182,10 +180,8 @@
           break;
       }
 
-      /* frameFlags tells if a frame is compressed or encrypted.
-         Such frames are simply ignored: the next one is still valid. */
-      void frameFlags;
-
+      /* Any frame flags (compressed, encrypted, ...) are ignored here:
+         the next frame still starts right after this one. */
       p += size;
     }
 
@@ -383,6 +379,13 @@
         return;
       }
 
+      /* Track number is binary, not text: 2 bytes of padding, then the number. */
+      if (key === 'trkn') {
+        const raw = u8.subarray(payloadStart, data.end);
+        if (raw.length >= 4) out.tags.trackNo = (raw[2] << 8) | raw[3];
+        return;
+      }
+
       /* Text atoms. Type 2 means UTF-16, everything else is UTF-8. */
       let value = '';
       if (dataType === 1) value = DEC.utf8.decode(u8.subarray(payloadStart, data.end));
@@ -397,10 +400,6 @@
       else if (key === '\u00a9alb') out.tags.album = out.tags.album || value;
       else if (key === '\u00a9day') out.tags.year = out.tags.year || value.slice(0, 4);
       else if (key === '\u00a9gen' || key === 'gnre') out.tags.genre = out.tags.genre || value;
-      else if (key === 'trkn') {
-        const raw = u8.subarray(payloadStart, data.end);
-        if (raw.length >= 4) out.tags.trackNo = (raw[2] << 8) | raw[3];
-      }
     });
 
     return out;
@@ -440,7 +439,11 @@
     }
   }
 
-  /** "Artist - Title.mp3" → { artist, title } */
+  /*
+     Only read() is exported. The player takes the song name from the
+     file name, so parsing the name is not needed any more.
+     fromFileName is kept for the test harness only.
+  */
   function fromFileName(fileName) {
     const base = String(fileName || '')
       .replace(/\.[^.]+$/, '')

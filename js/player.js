@@ -94,11 +94,7 @@
   /* ---------- OS media controls ---------- */
   function setSessionMetadata(track) {
     if (!('mediaSession' in navigator) || !window.MediaMetadata) return;
-    const info = {
-      title: track.title,
-      artist: track.artist || 'Unknown artist',
-      album: track.album || '',
-    };
+    const info = { title: track.title };
     if (currentArtUrl) {
       info.artwork = [{ src: currentArtUrl, sizes: '512x512' }];
     }
@@ -340,18 +336,11 @@
     setMuted(!state.muted);
   }
 
-  const SPEEDS = [1, 1.25, 1.5, 2, 0.75, 0.5];
-
   function setSpeed(value) {
     const speed = Math.min(3, Math.max(0.25, Number(value) || 1));
     state.speed = speed;
     audio.playbackRate = speed;
     emit('state');
-  }
-
-  function cycleSpeed() {
-    const index = SPEEDS.indexOf(state.speed);
-    setSpeed(SPEEDS[(index + 1) % SPEEDS.length]);
   }
 
   /** Apply saved settings without touching the queue. Used at startup. */
@@ -464,6 +453,25 @@
     if (changed) emit('queue');
   }
 
+  /**
+   * Put one song right after the song that is playing now.
+   * If it is already in the queue it moves, it is not duplicated.
+   */
+  function playNext(id) {
+    if (!byId.has(id)) return false;
+
+    const queue = state.queue.filter((item) => item !== id);
+    const currentIndex = queue.indexOf(state.currentId);
+    const at = currentIndex === -1 ? queue.length : currentIndex + 1;
+    queue.splice(at, 0, id);
+
+    state.queue = queue;
+    if (!state.order.includes(id)) state.order.push(id);
+    state.pos = state.currentId ? queue.indexOf(state.currentId) : -1;
+    emit('queue');
+    return true;
+  }
+
   function stop() {
     audio.pause();
     audio.removeAttribute('src');
@@ -557,7 +565,6 @@
     toggleMute,
     setMuted,
     setSpeed,
-    cycleSpeed,
     hydrate,
     setLibrary,
     playIds,
@@ -567,6 +574,7 @@
     cycleRepeat,
     removeFromQueue,
     appendToQueue,
+    playNext,
     stop,
     artFor: loadArt,
     ensureGraph,

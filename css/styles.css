@@ -40,9 +40,17 @@
   --row-h: 60px;
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
   --player-h: 92px;
+
+  /* Cover placeholder: two stops built from the song's own hue.
+     Only the lightness changes per theme. */
+  --grad-s1: 62%;
+  --grad-s2: 66%;
+  --grad-l1: 52%;
+  --grad-l2: 40%;
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --bg: #08080d;
   --bg-2: #0e0e17;
   --panel: #12121c;
@@ -58,10 +66,12 @@
   --scrim: rgba(4, 4, 10, 0.6);
   --glow-1: rgba(139, 92, 246, 0.18);
   --glow-2: rgba(34, 211, 238, 0.12);
-  --thumb-text: #fff;
+  --grad-l1: 46%;
+  --grad-l2: 30%;
 }
 
 [data-theme='light'] {
+  color-scheme: light;
   --bg: #f2f3f9;
   --bg-2: #ffffff;
   --panel: #ffffff;
@@ -77,7 +87,8 @@
   --scrim: rgba(20, 22, 40, 0.35);
   --glow-1: rgba(139, 92, 246, 0.12);
   --glow-2: rgba(34, 211, 238, 0.1);
-  --thumb-text: #fff;
+  --grad-l1: 74%;
+  --grad-l2: 62%;
 }
 
 /* ---------- Reset ---------- */
@@ -116,6 +127,15 @@ body::before {
   background:
     radial-gradient(45% 32% at 18% 0%, var(--glow-1), transparent 70%),
     radial-gradient(38% 28% at 88% 6%, var(--glow-2), transparent 70%);
+}
+
+/* Song names come in many languages. Each line picks its own direction,
+   so Persian and English names both read correctly. */
+.title,
+.np-title,
+.q-title,
+.np-titles h2 {
+  unicode-bidi: plaintext;
 }
 
 h1,
@@ -247,6 +267,8 @@ select {
   text-transform: uppercase;
 }
 
+/* Only the phone drawer needs this button. The media query that decides
+   that lives with the other responsive rules at the end of this file. */
 .close-sidebar {
   display: none;
   margin-left: auto;
@@ -400,15 +422,11 @@ select {
   border-radius: 11px;
   color: var(--muted);
   position: relative;
-  transition: background 0.15s var(--ease), color 0.15s var(--ease),
-    transform 0.12s var(--ease);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
 }
 .icon-btn:hover {
   background: var(--hover);
   color: var(--text);
-}
-.icon-btn:active {
-  transform: scale(0.94);
 }
 .icon-btn.is-on {
   color: var(--accent);
@@ -586,7 +604,7 @@ select {
 
 /* ---------- Track list ---------- */
 .list-wrap {
-  --cols: 46px minmax(0, 1fr) minmax(0, 0.62fr) 64px 78px;
+  --cols: 46px minmax(0, 1fr) 64px 78px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -724,24 +742,15 @@ select {
   background-color: var(--panel-2);
   display: grid;
   place-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--thumb-text);
-  letter-spacing: 0.02em;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 .thumb.placeholder {
   background-image: linear-gradient(
     135deg,
-    hsl(var(--hue, 260) 62% 52%),
-    hsl(calc(var(--hue, 260) + 45) 66% 40%)
+    hsl(var(--hue, 260) var(--grad-s1) var(--grad-l1)),
+    hsl(calc(var(--hue, 260) + 45) var(--grad-s2) var(--grad-l2))
   );
-}
-.thumb .icon {
-  width: 18px;
-  height: 18px;
-  opacity: 0.85;
 }
 
 .title-text {
@@ -757,21 +766,7 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.005em;
-}
-.artist {
-  font-size: 12px;
-  color: var(--muted-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.album {
-  font-size: 12.5px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
 }
 
 .time {
@@ -831,13 +826,6 @@ select {
     opacity: 1;
     transform: none;
   }
-}
-
-.list-foot {
-  padding: 14px 0 4px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted-2);
 }
 
 /* ---------- Empty state ---------- */
@@ -948,15 +936,12 @@ select {
   place-items: center;
   background-size: cover;
   background-position: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
 }
 .np-art-inner.placeholder {
   background-image: linear-gradient(
     135deg,
-    hsl(var(--hue, 260) 62% 52%),
-    hsl(calc(var(--hue, 260) + 45) 66% 40%)
+    hsl(var(--hue, 260) var(--grad-s1) var(--grad-l1)),
+    hsl(calc(var(--hue, 260) + 45) var(--grad-s2) var(--grad-l2))
   );
 }
 .np-art-expand {
@@ -986,13 +971,6 @@ select {
 .np-title {
   font-size: 13.5px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.np-artist {
-  font-size: 12px;
-  color: var(--muted-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1033,7 +1011,7 @@ select {
   color: #0a0a12;
   background: linear-gradient(135deg, #fff, #e6e8f5);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
-  transition: transform 0.12s var(--ease), box-shadow 0.2s var(--ease);
+  transition: box-shadow 0.2s var(--ease);
 }
 [data-theme='dark'] .play-btn {
   color: #0a0a12;
@@ -1044,10 +1022,7 @@ select {
   box-shadow: 0 10px 24px rgba(109, 92, 247, 0.32);
 }
 .play-btn:hover {
-  transform: scale(1.05);
-}
-.play-btn:active {
-  transform: scale(0.96);
+  box-shadow: 0 0 0 5px var(--accent-soft);
 }
 .play-btn .icon {
   width: 20px;
@@ -1178,23 +1153,41 @@ input[type='range']::-moz-range-thumb {
   display: flex;
   align-items: center;
   gap: 2px;
+  position: relative;
 }
-.btn-tiny {
-  height: 28px;
-  min-width: 38px;
-  padding: 0 8px;
+.vol-pct {
+  position: absolute;
+  right: 100%;
+  margin-right: 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
+.speed {
+  display: inline-flex;
+}
+.speed-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--field);
+  border: 1px solid var(--line);
   border-radius: 8px;
+  padding: 0 28px 0 8px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  background: var(--field);
-  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
-  font-variant-numeric: tabular-nums;
-}
-.btn-tiny:hover {
   color: var(--text);
+  cursor: pointer;
+  min-width: 56px;
+}
+.speed-select:hover {
   border-color: var(--muted-2);
+}
+.speed-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ---------- Now playing ---------- */
@@ -1294,18 +1287,9 @@ input[type='range']::-moz-range-thumb {
 .np-cover-inner.placeholder {
   background-image: linear-gradient(
     135deg,
-    hsl(var(--hue, 260) 60% 50%),
-    hsl(calc(var(--hue, 260) + 45) 65% 38%)
+    hsl(var(--hue, 260) var(--grad-s1) var(--grad-l1)),
+    hsl(calc(var(--hue, 260) + 45) var(--grad-s2) var(--grad-l2))
   );
-  font-size: clamp(48px, 7vw, 96px);
-  font-weight: 600;
-  letter-spacing: -0.05em;
-}
-.np-cover-inner .icon {
-  width: 64px;
-  height: 64px;
-  stroke-width: 1.4;
-  opacity: 0.85;
 }
 
 .np-info {
@@ -1327,14 +1311,6 @@ input[type='range']::-moz-range-thumb {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-}
-.np-titles p {
-  margin-top: 6px;
-  font-size: 14px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .viz {
@@ -1474,16 +1450,13 @@ input[type='range']::-moz-range-thumb {
   background-color: var(--panel-2);
   display: grid;
   place-items: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: #fff;
   overflow: hidden;
 }
 .q-thumb.placeholder {
   background-image: linear-gradient(
     135deg,
-    hsl(var(--hue, 260) 62% 52%),
-    hsl(calc(var(--hue, 260) + 45) 66% 40%)
+    hsl(var(--hue, 260) var(--grad-s1) var(--grad-l1)),
+    hsl(calc(var(--hue, 260) + 45) var(--grad-s2) var(--grad-l2))
   );
 }
 .q-text {
@@ -1596,6 +1569,33 @@ body.is-dragging .drop-overlay {
 .drop-box span {
   color: var(--muted-2);
   font-size: 13px;
+}
+
+/* ---------- Context menu ---------- */
+.ctx-menu {
+  position: fixed;
+  z-index: 100;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 6px 0;
+  min-width: 180px;
+}
+.ctx-menu > div {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ctx-menu > div:hover {
+  background: var(--hover);
+}
+.ctx-menu > hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 6px 0;
 }
 
 /* ---------- Dialogs ---------- */
@@ -1763,10 +1763,6 @@ kbd {
   .list-wrap {
     --cols: 42px minmax(0, 1fr) 60px 72px;
   }
-  .c-album,
-  .album {
-    display: none;
-  }
   .search {
     width: 200px;
   }
@@ -1775,6 +1771,13 @@ kbd {
   }
   .np-cover {
     width: min(340px, 34vh);
+  }
+}
+
+/* Desktop: the sidebar is always visible, so it needs no close button. */
+@media (min-width: 901px) {
+  .close-sidebar {
+    display: none;
   }
 }
 
@@ -1839,9 +1842,6 @@ kbd {
     justify-self: center;
     text-align: center;
   }
-  .np-titles p {
-    text-align: center;
-  }
   .viz {
     height: 56px;
   }
@@ -1886,7 +1886,7 @@ kbd {
     padding: 0 6px;
   }
   .c-time,
-  .time {
+  .cell.time {
     display: none;
   }
   .row {

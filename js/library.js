@@ -2,10 +2,13 @@
    library.js — the song list in memory, plus importing.
 
    Import steps for one file:
-     1. read its tags (title, artist, cover...)
+     1. read the picture inside the file (if there is one)
      2. measure its length
-     3. make a small thumbnail from the cover
+     3. make a small thumbnail from the picture
      4. save everything to IndexedDB
+
+   The song name is always the file name without its extension.
+   Tags inside the file are not used for the name.
    ========================================================= */
 (function () {
   'use strict';
@@ -28,29 +31,18 @@
     return (track.fileName || '') + '|' + (track.size || 0);
   }
 
+  /* Only the name and the length can be sorted: the row shows nothing else. */
   const SORTS = {
     'added-desc': (a, b) => (b.addedAt || 0) - (a.addedAt || 0),
     'added-asc': (a, b) => (a.addedAt || 0) - (b.addedAt || 0),
     'title-asc': (a, b) => collator.compare(a.title || '', b.title || ''),
     'title-desc': (a, b) => collator.compare(b.title || '', a.title || ''),
-    'artist-asc': (a, b) =>
-      collator.compare(a.artist || '', b.artist || '') ||
-      collator.compare(a.title || '', b.title || ''),
-    'album-asc': (a, b) =>
-      collator.compare(a.album || '', b.album || '') ||
-      (a.trackNo || 0) - (b.trackNo || 0) ||
-      collator.compare(a.title || '', b.title || ''),
     'duration-asc': (a, b) => (a.duration || 0) - (b.duration || 0),
     'duration-desc': (a, b) => (b.duration || 0) - (a.duration || 0),
   };
 
   async function buildTrack(file, addedAt) {
     const meta = await Tags.read(file);
-    const tags = meta.tags || {};
-    const fromName = Tags.fromFileName(file.name);
-
-    const title = (tags.title || fromName.title || '').trim() || 'Untitled';
-    const artist = (tags.artist || fromName.artist || '').trim();
     const art = meta.picture || null;
     const duration = await U.probeDuration(file);
     const thumb = art ? await U.makeThumb(art, 96) : null;
@@ -59,12 +51,7 @@
       art,
       track: {
         id: U.uid(),
-        title,
-        artist,
-        album: (tags.album || '').trim(),
-        year: tags.year || '',
-        genre: tags.genre || '',
-        trackNo: tags.trackNo || 0,
+        title: U.baseName(file.name),
         duration: Math.round(duration * 10) / 10,
         size: file.size || 0,
         mime: file.type || '',
@@ -102,7 +89,7 @@
      */
     async importFiles(fileList, onProgress) {
       const files = Array.from(fileList || []).filter(isAudioFile);
-      const report = { total: files.length, added: 0, skipped: 0, failed: 0, ids: [] };
+      const report = { total: files.length, added: 0, skipped: 0, failed: 0, ids: [], quota: false };
       if (!files.length) return report;
 
       const base = Date.now();
@@ -130,6 +117,9 @@
         } catch (error) {
           console.warn('Could not import', file.name, error);
           report.failed += 1;
+          if (error && (error.name === 'QuotaExceededError' || /quota|storage/i.test(error.message || ''))) {
+            report.quota = true;
+          }
         }
 
         if (onProgress) onProgress(report);
@@ -193,9 +183,8 @@
 
       if (words.length) {
         items = items.filter((track) => {
-          const haystack = [track.title, track.artist, track.album, track.fileName]
-            .join(' ')
-            .toLowerCase();
+          /* The name is the file name, so one field is enough. */
+          const haystack = String(track.title || track.fileName || '').toLowerCase();
           return words.every((word) => haystack.includes(word));
         });
       }

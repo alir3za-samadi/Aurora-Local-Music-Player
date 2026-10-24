@@ -131,16 +131,17 @@
     return hash;
   };
 
-  U.initials = function (text) {
-    const words = String(text || '')
-      .replace(/\.[a-z0-9]{2,4}$/i, '')
-      .split(/[\s\-_]+/)
-      .filter(Boolean);
-    if (!words.length) return '♪';
-    return words
-      .slice(0, 2)
-      .map((w) => w[0].toUpperCase())
-      .join('');
+  /**
+   * The file name without its extension. The player shows this as the
+   * song name, because the file name is the one thing the user typed.
+   * ".hidden" and "no-extension" are returned unchanged.
+   */
+  U.baseName = function (name) {
+    const value = String(name || '').trim();
+    if (!value) return 'Untitled';
+    const dot = value.lastIndexOf('.');
+    if (dot <= 0) return value;
+    return value.slice(0, dot) || value;
   };
 
   /* ---------- localStorage ---------- */

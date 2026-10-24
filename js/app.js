@@ -25,7 +25,10 @@
       await DB.open();
     } catch (error) {
       console.error(error);
-      UI.toast('Storage is not available: ' + error.message, { type: 'error', duration: 9000 });
+      UI.toast(
+        'This browser blocked local storage. Open index.html in Chrome or Edge to keep your songs.',
+        { type: 'error', duration: 9000 }
+      );
       return false;
     }
 

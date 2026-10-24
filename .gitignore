@@ -1,0 +1,9 @@
+# Test output: Chrome profile and screenshots.
+# The browser test creates this folder. It is never part of the app.
+tools/.tmp/
+
+# Editor and OS files.
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

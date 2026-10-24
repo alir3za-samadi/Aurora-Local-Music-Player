@@ -26,24 +26,26 @@
   /* =========================================================
      Small builders
      ========================================================= */
+  /**
+   * A cover node. Songs with a picture show it; the rest get a plain
+   * gradient built from the song's own hue. Nothing is drawn on top.
+   */
   function thumbNode(track, extraClass) {
     const node = U.el('div', { class: (extraClass || 'thumb') + (track.thumb ? '' : ' placeholder') });
     if (track.thumb) {
       node.style.backgroundImage = 'url("' + track.thumb + '")';
     } else {
       node.style.setProperty('--hue', String(U.hue(track.title)));
-      node.textContent = U.initials(track.title);
     }
     return node;
   }
 
-  function placeholder(node, label, useIcon) {
+  /** Turn a node into the gradient cover, and drop any old picture. */
+  function placeholder(node, label) {
     node.style.removeProperty('background-image');
     node.classList.add('placeholder');
     node.style.setProperty('--hue', String(U.hue(label || 'music')));
     node.textContent = '';
-    if (useIcon) node.appendChild(U.icon('music'));
-    else node.textContent = U.initials(label);
   }
 
   /* =========================================================
@@ -62,7 +64,7 @@
       role: 'option',
       tabindex: '0',
       'aria-selected': isCurrent ? 'true' : 'false',
-      'aria-label': track.title + ' — ' + (track.artist || 'Unknown artist'),
+      'aria-label': track.title,
     });
 
     const bars = U.el('span', { class: 'bars', 'aria-hidden': 'true' }, [
@@ -78,13 +80,9 @@
 
     const titleCell = U.el('div', { class: 'cell title-cell' }, [
       thumbNode(track),
-      U.el('div', { class: 'title-text' }, [
-        U.el('div', { class: 'title', text: track.title }),
-        U.el('div', { class: 'artist', text: track.artist || 'Unknown artist' }),
-      ]),
+      U.el('div', { class: 'title-text' }, [U.el('div', { class: 'title', text: track.title })]),
     ]);
 
-    const album = U.el('div', { class: 'cell album', text: track.album || '—' });
     const time = U.el('div', { class: 'cell time', text: U.fmtTime(track.duration) });
 
     const fav = U.el(
@@ -112,7 +110,6 @@
 
     row.appendChild(idx);
     row.appendChild(titleCell);
-    row.appendChild(album);
     row.appendChild(time);
     row.appendChild(U.el('div', { class: 'cell actions' }, [fav, remove]));
 
@@ -122,10 +119,7 @@
   function appendRows() {
     const items = state.visible;
     const end = Math.min(items.length, state.rendered + state.limit);
-    if (state.rendered >= end) {
-      els.listFoot.hidden = true;
-      return;
-    }
+    if (state.rendered >= end) return;
 
     const fragment = document.createDocumentFragment();
     for (let i = state.rendered; i < end; i++) {
@@ -133,13 +127,6 @@
     }
     els.list.appendChild(fragment);
     state.rendered = end;
-
-    if (end < items.length) {
-      els.listFoot.hidden = false;
-      els.listFoot.textContent = 'Showing ' + end + ' of ' + items.length + '…';
-    } else {
-      els.listFoot.hidden = true;
-    }
   }
 
   function renderList(preserveScroll) {
@@ -240,8 +227,8 @@
      ========================================================= */
   function setArtwork(track) {
     if (!track) {
-      placeholder(els.npArtInner, 'music', true);
-      placeholder(els.npCoverBigInner, 'music', true);
+      placeholder(els.npArtInner, 'music');
+      placeholder(els.npCoverBigInner, 'music');
       els.npBg.style.backgroundImage = 'none';
       return;
     }
@@ -251,7 +238,7 @@
       els.npArtInner.style.backgroundImage = 'url("' + track.thumb + '")';
       els.npArtInner.textContent = '';
     } else {
-      placeholder(els.npArtInner, track.title, false);
+      placeholder(els.npArtInner, track.title);
     }
 
     const bigCover = (url) => {
@@ -262,8 +249,13 @@
       els.npBg.style.backgroundImage = 'url("' + url + '")';
     };
 
-    if (track.thumb) bigCover(track.thumb);
-    else placeholder(els.npCoverBigInner, track.title, false);
+    if (track.thumb) {
+      bigCover(track.thumb);
+    } else {
+      placeholder(els.npCoverBigInner, track.title);
+      /* No cover: drop the old one from the background too. */
+      els.npBg.style.backgroundImage = 'none';
+    }
 
     if (track.hasArt) {
       Player.artFor(track.id).then((url) => {
@@ -311,12 +303,18 @@
       button.setAttribute('aria-pressed', String(muted));
       button.classList.toggle('is-on', muted);
     });
+
+    /* The number that appears while the pointer is over the slider. */
+    U.$$('.vol-pct').forEach((label) => {
+      label.textContent = percent + '%';
+    });
   }
 
   function renderSpeed() {
-    U.$$('[data-act="speed"]').forEach((button) => {
-      button.textContent = Player.state.speed + '×';
-      button.setAttribute('aria-label', 'Playback speed: ' + Player.state.speed + '×');
+    U.$$('.speed-select').forEach((select) => {
+      const value = String(Player.state.speed);
+      if (select.value !== value) select.value = value;
+      select.setAttribute('aria-label', 'Playback speed: ' + value + 'x');
     });
   }
 
@@ -332,12 +330,7 @@
     });
 
     els.npTitle.textContent = track ? track.title : 'Nothing playing';
-    els.npArtist.textContent = track ? track.artist || 'Unknown artist' : 'Add songs to begin';
-
     els.bigTitle.textContent = track ? track.title : 'Nothing playing';
-    els.bigArtist.textContent = track
-      ? [track.artist || 'Unknown artist', track.album].filter(Boolean).join(' — ')
-      : 'Pick a song from your library';
 
     U.$$('.fav-btn').forEach((button) => {
       const on = Boolean(track && track.favorite);
@@ -401,12 +394,7 @@
       });
 
       row.appendChild(thumbNode(track, 'q-thumb'));
-      row.appendChild(
-        U.el('div', { class: 'q-text' }, [
-          U.el('div', { class: 'q-title', text: track.title }),
-          U.el('div', { class: 'q-artist', text: track.artist || 'Unknown artist' }),
-        ])
-      );
+      row.appendChild(U.el('div', { class: 'q-text' }, [U.el('div', { class: 'q-title', text: track.title })]));
       row.appendChild(U.el('span', { class: 'q-time', text: U.fmtTime(track.duration) }));
       row.appendChild(
         U.el(
@@ -509,33 +497,31 @@
   /* =========================================================
      Panels
      ========================================================= */
-  function showScrim() {
-    els.scrim.hidden = false;
-    requestAnimationFrame(() => els.scrim.classList.add('is-open'));
+  function showScrim(scrim) {
+    scrim.hidden = false;
+    requestAnimationFrame(() => scrim.classList.add('is-open'));
   }
 
-  function hideScrim() {
-    if (els.queue.classList.contains('is-open') || els.sidebar.classList.contains('is-open')) return;
-    els.scrim.classList.remove('is-open');
+  function hideScrim(scrim) {
+    scrim.classList.remove('is-open');
   }
 
   function openSidebar() {
     els.sidebar.classList.add('is-open');
-    showScrim();
+    showScrim(els.scrimSidebar);
   }
 
   function closeSidebar() {
     if (!els.sidebar.classList.contains('is-open')) return;
     els.sidebar.classList.remove('is-open');
-    hideScrim();
+    hideScrim(els.scrimSidebar);
   }
 
   function openQueue() {
     renderQueue();
     els.queue.classList.add('is-open');
     els.queue.setAttribute('aria-hidden', 'false');
-    els.scrim.hidden = false;
-    showScrim();
+    showScrim(els.scrim);
     const current = els.queueList.querySelector('.q-row.is-current');
     if (current) current.scrollIntoView({ block: 'center' });
   }
@@ -544,7 +530,7 @@
     if (!els.queue.classList.contains('is-open')) return;
     els.queue.classList.remove('is-open');
     els.queue.setAttribute('aria-hidden', 'true');
-    hideScrim();
+    hideScrim(els.scrim);
   }
 
   function toggleQueue() {
@@ -663,6 +649,78 @@
     }
 
     if (Player.state.currentId === id) renderPlayer();
+  }
+
+  /* =========================================================
+     Context menu (right-click on a song)
+     ========================================================= */
+  /** One row of the menu. Keyboard friendly, so the menu works without a mouse. */
+  function contextItem(label, run) {
+    const item = U.el('div', { role: 'menuitem', tabindex: '0', text: label });
+    item.addEventListener('click', () => {
+      run();
+      closeContextMenu();
+    });
+    item.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      item.click();
+    });
+    return item;
+  }
+
+  /**
+   * Open the song menu. `source` is 'queue' when the click came from the
+   * queue drawer; there the last item removes from the queue, not the library.
+   */
+  function openContextMenu(event, id, source) {
+    event.preventDefault();
+
+    const track = Library.byId.get(id);
+    if (!track) return;
+
+    const menu = els.ctxMenu;
+    menu.textContent = '';
+
+    menu.appendChild(contextItem('Play next', () => Player.playNext(id)));
+    menu.appendChild(
+      contextItem(track.favorite ? 'Remove from favorites' : 'Add to favorites', () => toggleFavorite(id))
+    );
+    menu.appendChild(U.el('hr'));
+    menu.appendChild(
+      source === 'queue'
+        ? contextItem('Remove from queue', () => {
+            Player.removeFromQueue(id);
+            renderQueue();
+            markCurrentRow();
+          })
+        : contextItem('Remove from library', () => removeTrack(id))
+    );
+
+    /* Keep the menu inside the window. */
+    const rect = event.target.getBoundingClientRect();
+    menu.hidden = false;
+    const width = menu.offsetWidth;
+    const height = menu.offsetHeight;
+    const left = Math.min(rect.left, window.innerWidth - width - 8);
+    const top = Math.min(event.clientY || rect.top, window.innerHeight - height - 8);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = Math.max(8, top) + 'px';
+
+    /* Close on the next click anywhere, or on Escape. */
+    document.addEventListener('click', closeContextMenu, { once: true });
+    document.addEventListener('keydown', onContextMenuKey);
+    const first = menu.querySelector('[role="menuitem"]');
+    if (first) first.focus();
+  }
+
+  function closeContextMenu() {
+    els.ctxMenu.hidden = true;
+    document.removeEventListener('keydown', onContextMenuKey);
+  }
+
+  function onContextMenuKey(event) {
+    if (event.key === 'Escape') closeContextMenu();
   }
 
   async function removeTrack(id) {
@@ -835,6 +893,13 @@
       });
     }
 
+    if (report.quota) {
+      toast('Browser storage is full. Remove some songs to make room.', {
+        type: 'error',
+        duration: 7000,
+      });
+    }
+
     refreshStorage();
   }
 
@@ -911,9 +976,6 @@
       case 'mute':
         Player.toggleMute();
         break;
-      case 'speed':
-        Player.cycleSpeed();
-        break;
       case 'favorite':
         toggleFavorite(Player.state.currentId);
         break;
@@ -984,6 +1046,26 @@
       if (row) playRow(row.dataset.id);
     });
 
+    /* Right-click opens the song menu, in the list and in the queue drawer. */
+    document.addEventListener('contextmenu', (event) => {
+      const target = event.target;
+      const row = target.closest && target.closest('.row');
+      if (row) {
+        openContextMenu(event, row.dataset.id, 'list');
+        return;
+      }
+      const queueRow = target.closest && target.closest('.q-row');
+      if (queueRow) openContextMenu(event, queueRow.dataset.qid, 'queue');
+    });
+
+    /* Speed dropdown */
+    U.$$('.speed-select').forEach((select) => {
+      select.value = String(Player.state.speed);
+      select.addEventListener('change', (e) => {
+        Player.setSpeed(Number(e.target.value));
+      });
+    });
+
     /* ---------- sidebar / nav ---------- */
     U.$$('.nav-item').forEach((item) => {
       item.addEventListener('click', () => {
@@ -995,6 +1077,7 @@
     els.btnMenu.addEventListener('click', openSidebar);
     els.btnCloseSidebar.addEventListener('click', closeSidebar);
     els.scrim.addEventListener('click', closePanels);
+    els.scrimSidebar.addEventListener('click', closeSidebar);
 
     /* ---------- theme, help, clear ---------- */
     els.btnTheme.addEventListener('click', toggleTheme);
@@ -1073,9 +1156,24 @@
     });
 
     U.$$('.vol').forEach((input) => {
+      const volPct = input.parentElement.querySelector('.vol-pct');
       input.addEventListener('input', () => {
-        Player.setVolume(Number(input.value) / 100);
+        const val = Number(input.value);
+        Player.setVolume(val / 100);
+        if (volPct) volPct.textContent = val + '%';
       });
+      input.addEventListener('pointerenter', () => {
+        if (volPct) volPct.style.opacity = '1';
+      });
+      input.addEventListener('pointerleave', () => {
+        if (volPct) volPct.style.opacity = '0';
+      });
+      /* Initialize */
+      if (volPct) {
+        volPct.textContent = input.value + '%';
+        volPct.style.opacity = '0';
+        volPct.style.transition = 'opacity 0.15s var(--ease)';
+      }
     });
 
     /* ---------- now playing ---------- */
@@ -1180,6 +1278,11 @@
       return;
     }
 
+    /* Let the keyboard activate real buttons instead of toggling music. */
+    if (event.key === ' ' && target.closest && target.closest('button, a, [role="button"], select')) {
+      return;
+    }
+
     switch (event.key) {
       case ' ':
       case 'k':
@@ -1254,12 +1357,12 @@
   function cache() {
     els.sidebar = U.$('#sidebar');
     els.scrim = U.$('#scrim');
+    els.scrimSidebar = U.$('#scrimSidebar');
     els.search = U.$('#search');
     els.searchClear = U.$('#btnClearSearch');
     els.sort = U.$('#sort');
     els.list = U.$('#list');
     els.listHead = U.$('.list-head');
-    els.listFoot = U.$('#listFoot');
     els.empty = U.$('#empty');
     els.emptyTitle = U.$('#emptyTitle');
     els.emptyText = U.$('#emptyText');
@@ -1274,9 +1377,8 @@
     els.npArt = U.$('#npArt');
     els.npArtInner = U.$('#npArtInner');
     els.npTitle = U.$('#npTitle');
-    els.npArtist = U.$('#npArtist');
     els.bigTitle = U.$('#bigTitle');
-    els.bigArtist = U.$('#bigArtist');
+    els.ctxMenu = U.$('#ctxMenu');
     els.npCoverBigInner = U.$('#npCoverBigInner');
     els.npBg = U.$('#npBg');
     els.nowPlaying = U.$('#nowPlaying');
@@ -1339,6 +1441,7 @@
     els.sort.value = state.sort;
 
     els.scrim.hidden = false;
+    els.scrimSidebar.hidden = false;
     bindEvents();
     subscribe();
     renderList();
