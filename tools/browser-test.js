@@ -619,6 +619,45 @@ async function main() {
   })`);
   check('queue drawer opens', queueOpen.open && queueOpen.rows === 2, queueOpen.meta);
   check('scrim shown with drawer', queueOpen.scrim);
+  /* keyboard reorder of a queue row */
+  const kbResult = await evaluate(`(async () => {
+    const drawer = document.querySelector('#queue');
+    if (!drawer.classList.contains('is-open')) document.querySelector('.player [data-act="queue"]').click();
+    await new Promise((r) => setTimeout(r, 300));
+    const handle = document.querySelector('#queue .q-drag');
+    if (!handle) return { ok: false, reason: 'no handle' };
+    const before = Player.state.queue.slice();
+    handle.focus();
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 200));
+    const after = Player.state.queue.slice();
+    return { ok: true, before: before, after: after, moved: before.join() !== after.join() };
+  })()`);
+  check('keyboard reorder moves a queue row', kbResult.ok && kbResult.moved, JSON.stringify(kbResult.after));
+  /* dragging a queue row reorders the play order */
+  const dragResult = await evaluate(`(async () => {
+    const handle = document.querySelector('#queue .q-drag');
+    const rows = Array.from(document.querySelectorAll('#queue .q-row'));
+    if (!handle || rows.length < 2) return { ok: false, reason: 'no rows' };
+    const r0 = rows[0].getBoundingClientRect();
+    const r1 = rows[1].getBoundingClientRect();
+    const cx = r0.left + r0.width / 2;
+    const cy0 = r0.top + r0.height / 2;
+    handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, clientX: cx, clientY: cy0 }));
+    await new Promise((r) => setTimeout(r, 60));
+    const midY = r1.top + r1.height / 2 + 40;
+    handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 1, clientX: cx, clientY: midY }));
+    await new Promise((r) => setTimeout(r, 60));
+    handle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, clientX: cx, clientY: midY }));
+    await new Promise((r) => setTimeout(r, 200));
+    return { ok: true, queue: Player.state.queue.slice(), ids: rows.map((r) => r.dataset.qid) };
+  })()`);
+  const dragMoved = dragResult.ok && dragResult.queue.length === 2 && dragResult.queue[0] !== dragResult.ids[0];
+  check('drag reorders the queue', dragMoved, JSON.stringify(dragResult.queue));
+  await evaluate('document.activeElement && document.activeElement.blur && document.activeElement.blur(); document.body.focus(); true');
+  await sleep(200);
+
+
 
   /* the same menu works inside the queue drawer */
   await evaluate(`(() => {

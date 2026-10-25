@@ -253,7 +253,7 @@ cd "C:\Users\Alir3za\Downloads\Music Player\V3"
 node tools/browser-test.js
 ```
 
-- Expected result: `67/67 checks passed` and `console errors: 0`.
+- Expected result: `69/69 checks passed` and `console errors: 0`.
 - The test starts its own headless Chrome with its own profile under `tools/.tmp/`,
   so it never touches the songs in the real browser profile.
 - It builds its own audio files in memory: a 2 s WAV, a 3 s WAV, and an MP3 with a

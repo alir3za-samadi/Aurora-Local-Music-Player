@@ -201,31 +201,6 @@ The files in `js/` are plain scripts, not modules. They share globals (`U`, `DB`
 `Tags`, `Player`, `Library`, `UI`), so **the order of the `<script>` tags matters**.
 `AGENTS.md` explains why and lists the order.
 
-## Testing
-
-You do not need this part to use the app. It is here to check a change before you keep
-it.
-
-```powershell
-cd "C:\Users\Alir3za\Downloads\Music Player\V3"
-node tools/browser-test.js
-```
-
-The test starts its own headless Chrome, builds made-up songs in memory, imports them,
-plays them, seeks, opens the menu, reloads the page, and checks 67 points. It prints
-`67/67 checks passed` at the end.
-
-It needs no packages, and it uses its own browser profile, so it never touches the
-songs you added by hand. The output also includes `console errors: 0`. If Chrome is
-somewhere else, point the test at it:
-
-```powershell
-$env:CHROME = "D:\path\to\chrome.exe"
-node tools/browser-test.js
-```
-
-The test also saves five screenshots in `tools/.tmp/`. One of them is the light theme.
-
 ## Known limits
 
 - Songs belong to one browser profile. Use **Add folder** again to rebuild the library
