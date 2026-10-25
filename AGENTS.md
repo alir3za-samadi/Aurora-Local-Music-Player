@@ -97,6 +97,7 @@ Key prefix `aurora.v3.` (defined once in `util.js` as `U.store`). Access it thro
 | `aurora.v3.view` | `'all'` or `'favorites'` |
 | `aurora.v3.sort` | one of the 6 sort keys in `library.js` |
 | `aurora.v3.theme` | `'dark'` or `'light'` |
+| `aurora.v3.palette` | `'default'` or `'vercel'` |
 
 `aurora.v3.state` holds:
 
@@ -125,9 +126,9 @@ tab becomes hidden, so a close does not lose the position. Do not add a save on 
 
 ### First paint and the theme
 
-`app.js` sets `document.documentElement.dataset.theme` **before** anything renders, so
-the first paint has the right colors and does not flash. If you add a setting that
-changes colors, restore it in the same early step.
+`app.js` sets `document.documentElement.dataset.theme` and `dataset.palette`
+**before** anything renders, so the first paint has the right colors and does not
+flash. If you add a setting that changes colors, restore it in the same early step.
 
 ---
 
@@ -163,8 +164,12 @@ The queue is also written to localStorage, so a reload continues in the same ord
   dropped, nothing else. Tag text is ignored on purpose, so a wrong tag can never
   rename a file. `Tags.read` is called only to find the cover picture.
 - **Rows have exactly four cells:** index, name, time, actions. Do not add artist,
-  album, or a second line to a row. The CSS grid in `.list-wrap` sets the column count
-  with `--cols`; the three breakpoints must keep the same number of cells.
+  album, or a second line to a row. The CSS grid sets the column count with `--cols`;
+  `.list-wrap` and `.queue-list` each define their own, and the three breakpoints must
+  keep the same number of cells.
+- **Row actions are always visible.** The heart and the remove button have no hover
+  step. A hidden button looked like an empty row, and a touch screen has no hover.
+  The player bar and the now-playing sheet keep their own `data-act="favorite"`.
 - **Rows are DOM, never HTML strings.** See rule 6 above.
 - **Events are delegated.** One listener on the list, one on the document. A control
   is marked with `data-act="name"` (global) or `data-row-action="name"` (inside a
@@ -179,17 +184,30 @@ The queue is also written to localStorage, so a reload continues in the same ord
 - **The list renders in pages.** `state.rendered` grows by `limit` (200) when you
   scroll near the end. `state.visible` holds the full filtered list; only
   `state.rendered` of them are in the DOM. Do not render everything.
-- **Styling uses CSS variables** from `:root` in `styles.css`, and the theme flips
-  them through `[data-theme="light"]`. Never hard-code a color in the JS.
+- **Styling uses CSS variables** from `:root` in `styles.css`. The theme flips them
+  through `[data-theme="light"]`; the palette adds a second layer through
+  `[data-palette="vercel"]`. Never hard-code a color in the JS.
+- **The palette has three tokens that keep it neutral.** `--accent` is the main color,
+  `--accent-alt` is the second stop of a gradient, and `--accent-ink` is the text on
+  top of an accent button. A palette that sets `--accent` to white must also set
+  `--accent-ink` to black. The Vercel blocks also turn the glows transparent and set
+  `--grad-s1` / `--grad-s2` to `0%`, so covers come out gray.
 - **The cover placeholder is a plain gradient.** `thumbNode` and `placeholder` only set
   `--hue`; the two colors come from the `--grad-*` tokens. Never put text, initials, or
   an icon inside a cover.
+- **Queue rows are the same `.row` grid as the library.** `queueRowFor` builds one
+  row with four cells: grip (in the index cell), cover + name, time, heart, and
+  remove. The drawer (`#queueList`) and the Playing queue view (`#list`) both use it,
+  so the two surfaces cannot drift apart. Queue rows carry `data-qid`, not `data-id`;
+  every queue selector uses `[data-qid]`.
 - **The Playing queue view is a third view.** `state.view === 'queue'` renders the
   queue rows inside `#list`, with a shuffle footer. `renderList` returns early for it,
   and `updateHeader` / `updateEmpty` have branches for it. The search box filters the
   queue rows there. The sort dropdown is hidden, because the queue order is manual.
-  While a search is active the grip is hidden: a drag would read only the rows on
-  screen and drop the hidden ones.
+  While a search is active the grip is replaced by a spacer: a drag would read only
+  the rows on screen and drop the hidden ones.
+- **A faint line separates rows.** `.row + .row::before` draws an inset 1 px line.
+  It is on purpose, not a broken border radius. The inset keeps the hover shape clean.
 - **Queue rows can be reordered.** The grip button (`.q-drag`) drives `startQueueDrag`
   with pointer events; Arrow Up / Down on the grip moves one step. The move and release
   listeners live on `document`, so a drag still works when pointer capture is not
@@ -216,6 +234,16 @@ Keep these in mind before you "fix" something.
 - **`U.icon` adds the `i-` prefix.** `U.icon('i-grip')` points at `#i-i-grip` and
   draws nothing, with no error in the console. That is how the drag grip became an
   invisible button once. Pass the bare name: `U.icon('grip')`.
+- **A sprite symbol that does not exist also draws nothing.** The help button pointed
+  at `#i-keyboard` for a while, but the symbol was never added, so the button was an
+  invisible 38 px square. If an icon is blank, check the `<symbol>` list first.
+- **`--cols` is set per container.** `.list-wrap` defines it, and `.queue-list` defines
+  its own. Without it, `grid-template-columns: var(--cols)` is invalid, so a row falls
+  back to one column and the cover, name, time, and buttons stack on separate lines.
+- **The volume label is placed from the slider centre.** `.vol-pct` uses
+  `bottom: calc(50% + 11px)` inside `.volume`, so it clears the 11 px thumb with a
+  small gap. `placeVolPct` sets the horizontal position from the input width, not the
+  whole `.volume` box, because the mute button starts that box.
 - **One `MediaElementSource` per element, ever.** `player.js` creates the Web Audio
   graph once and connects the single `<audio>` element to an `AnalyserNode` and then
   to the destination. Calling `createMediaElementSource` twice on the same element
@@ -274,7 +302,7 @@ cd "C:\Users\Alir3za\Downloads\Music Player\V3"
 node tools/browser-test.js
 ```
 
-- Expected result: `76/76 checks passed` and `console errors: 0`.
+- Expected result: `79/79 checks passed` and `console errors: 0`.
 - The test starts its own headless Chrome with its own profile under `tools/.tmp/`,
   so it never touches the songs in the real browser profile.
 - It builds its own audio files in memory: a 2 s WAV, a 3 s WAV, and an MP3 with a
@@ -282,12 +310,16 @@ node tools/browser-test.js
   shipping test files.
 - It also checks that the library survives a reload, that the position is restored,
   that the visualizer paints pixels, that the mobile drawer opens, that `color-scheme`
-  follows the theme, that the song menu moves a song with "Play next", that a drag moves
-  the row and shifts its neighbours, that a like touches only one row, that the volume
-  label sits on the thumb, and that a cover placeholder is a gradient with nothing drawn
-  on top.
-- It checks the row shape too: the title is the file name, the row has four cells, and
-  there is no artist, album, or "showing N of M" line.
+  follows the theme, that the palette select applies and saves Vercel, that the song
+  menu moves a song with "Play next", that a drag moves the row and shifts its
+  neighbours, that a like touches only one row, that the volume label sits on the
+  thumb, and that a cover placeholder is a gradient with nothing drawn on top.
+- Queue checks: the drawer rows and the Playing queue rows are 60 px and have the
+  same cells as the list, the drawer shuffle button is 32 px tall with a small gap
+  under it, and a queue row carries a heart.
+- Row checks: the heart and the remove button have `opacity: 1` with no hover, the
+  title is the file name, the row has four cells, and there is no artist, album, or
+  "showing N of M" line.
 - It writes five screenshots into `tools/.tmp/`.
 - If Chrome is elsewhere, set `CHROME` to the path.
 
@@ -299,8 +331,8 @@ the other checks. Keep the console-error counter at zero.
 1. Double-click `index.html`. Add a folder of real songs.
 2. Play one, seek, then reload the page. The song and the position must come back,
    paused.
-3. Switch to light theme, pick a different sort, favorite a song, reload. All three
-   must survive.
+3. Switch to light theme, pick the Vercel palette, pick a different sort, favorite a
+   song, reload. All four must survive.
 4. Press `?` and walk the shortcut list.
 5. Right-click a song in the list and in the queue drawer. Both menus must open, and
    "Play next" must move the song.

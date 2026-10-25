@@ -29,7 +29,8 @@ original files on disk are never changed, moved, or deleted.
 - 🔤 **6 sort modes** — newest, oldest, name A–Z, name Z–A, shortest, longest.
 - 🖱️ **Right-click menu** — right-click any song to play it next, favorite it, or
   remove it. The same menu works inside the queue drawer.
-- ❤️ **Favorites** — one click on the heart, in the list or in the player bar.
+- ❤️ **Favorites** — one click on the heart. It works in the list, in the queue,
+  and in the player bar.
 - 🎧 **Queue** — the queue button shows the play order. The queue holds every song
   that is visible right now, so search and sort change the order.
 - 🎚️ **Now playing** — click the cover in the player bar for a full view with a live
@@ -38,15 +39,18 @@ original files on disk are never changed, moved, or deleted.
   pointer is over it, and follows the knob while dragging.
 - 🅰️ **Vazirmatn font** — Persian and Arabic text render correctly. The font ships
   with the app, so it works offline.
-- 🗂️ **Playing queue view** — a third sidebar tab shows the play order, with drag
-  handles to reorder it.
+- 🗂️ **Playing queue view** — a third sidebar tab shows the play order. Its rows look
+  like the normal song rows: cover, name, time, heart, and a drag handle.
 - 🔀 **Drag to reorder** — grab the grip on a queue row (or press Arrow Up / Down on
   it) to change the play order. Works in the queue drawer too.
 - ⌨️ **Media keys** — the play, pause, next, and previous keys on your keyboard work.
   The song name also shows in the system media panel.
 - 🌗 **Themes** — dark and light. The app follows your system theme on the first run.
+- 🎨 **Palettes** — next to the theme button. `Default` is the violet look. `Vercel`
+  is plain black, white, and gray.
 - 🧹 **Remove and clear** — remove one song from its row, or clear the whole library
-  from the sidebar. Both ask for confirmation first.
+  from the sidebar. Both ask for confirmation first. The row buttons are always
+  visible, with no hover step.
 - 📱 **Responsive** — the sidebar becomes a drawer on a phone, and the list shows only
   the name and the time.
 
@@ -167,7 +171,7 @@ and playback starts.
 - The volume and the mute state.
 - The shuffle and repeat mode.
 - The play order (the queue) at the moment you closed the page.
-- The current view, the sort mode, and the theme.
+- The current view, the sort mode, the theme, and the palette.
 
 The search box starts empty again after a reload.
 

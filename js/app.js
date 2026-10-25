@@ -13,11 +13,16 @@
 
   const PERSIST_DELAY = 1500;
 
-  function restoreTheme() {
+  /** Theme and palette, applied before the first paint so nothing flashes. */
+  function restoreLook() {
+    const root = document.documentElement;
     const saved = U.store.get('theme', null);
     const prefersLight =
       window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-    document.documentElement.dataset.theme = saved || (prefersLight ? 'light' : 'dark');
+    root.dataset.theme = saved || (prefersLight ? 'light' : 'dark');
+
+    const savedPalette = U.store.get('palette', 'default');
+    root.dataset.palette = savedPalette === 'vercel' ? 'vercel' : 'default';
   }
 
   async function loadLibrary() {
@@ -102,7 +107,7 @@
   }
 
   async function boot() {
-    restoreTheme();
+    restoreLook();
     UI.init();
 
     const storageOk = await loadLibrary();

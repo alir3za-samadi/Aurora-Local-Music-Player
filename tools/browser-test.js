@@ -322,7 +322,7 @@ async function main() {
     hasTags: typeof Tags === 'object',
     theme: document.documentElement.dataset.theme,
     emptyShown: !document.getElementById('empty').hidden,
-    rows: document.querySelectorAll('.row').length,
+    rows: document.querySelectorAll('#list .row').length,
     fontLoaded: document.fonts.check('16px Inter'),
     fontStatus: document.fonts.status,
     storageText: document.getElementById('storageText').textContent,
@@ -404,7 +404,7 @@ async function main() {
   await send('DOM.setFileInputFiles', { files: [wavPath], nodeId: input.nodeId });
 
   await waitFor('Library.tracks.length === 1', 20000, 'first import');
-  await waitFor('document.querySelectorAll(".row").length === 1', 5000, 'first row');
+  await waitFor('document.querySelectorAll("#list .row").length === 1', 5000, 'first row');
 
   const afterImport = await evaluate(`({
     count: Library.tracks.length,
@@ -413,12 +413,12 @@ async function main() {
     hasTagFields: 'artist' in Library.tracks[0] || 'album' in Library.tracks[0] || 'year' in Library.tracks[0],
     duration: Library.tracks[0].duration,
     thumb: Library.tracks[0].thumb,
-    rowTitle: document.querySelector('.row .title').textContent,
-    rowChildren: document.querySelector('.row').children.length,
-    rowHasArtist: !!document.querySelector('.row .artist'),
-    rowHasAlbum: !!document.querySelector('.row .album'),
+    rowTitle: document.querySelector('#list .row .title').textContent,
+    rowChildren: document.querySelector('#list .row').children.length,
+    rowHasArtist: !!document.querySelector('#list .row .artist'),
+    rowHasAlbum: !!document.querySelector('#list .row .album'),
     placeholder: (() => {
-      const t = document.querySelector('.row .thumb');
+      const t = document.querySelector('#list .row .thumb');
       return {
         cls: t.className,
         text: t.textContent,
@@ -536,12 +536,12 @@ async function main() {
   /* ---------- 6. search / sort / views ---------- */
   await evaluate(`(() => { const s = document.getElementById('search'); s.value = 'zzz'; s.dispatchEvent(new Event('input', {bubbles:true})); })()`);
   await sleep(300);
-  const searchEmpty = await evaluate(`({ rows: document.querySelectorAll('.row').length, empty: !document.getElementById('empty').hidden, title: document.getElementById('emptyTitle').textContent })`);
+  const searchEmpty = await evaluate(`({ rows: document.querySelectorAll('#list .row').length, empty: !document.getElementById('empty').hidden, title: document.getElementById('emptyTitle').textContent })`);
   check('search filters everything out', searchEmpty.rows === 0 && searchEmpty.empty, searchEmpty.title);
 
   await evaluate(`document.getElementById('btnClearSearch').click()`);
   await sleep(300);
-  check('clear search restores rows', (await evaluate('document.querySelectorAll(".row").length')) === 1);
+  check('clear search restores rows', (await evaluate('document.querySelectorAll("#list .row").length')) === 1);
 
   await evaluate(`(() => { const s = document.getElementById('sort'); s.value = 'title-asc'; s.dispatchEvent(new Event('change', {bubbles:true})); })()`);
   await sleep(200);
@@ -551,7 +551,7 @@ async function main() {
   await send('DOM.setFileInputFiles', { files: [secondPath], nodeId: input.nodeId });
   await waitFor('Library.tracks.length === 2', 20000, 'second import');
   await sleep(300);
-  check('two rows after second import', (await evaluate('document.querySelectorAll(".row").length')) === 2);
+  check('two rows after second import', (await evaluate('document.querySelectorAll("#list .row").length')) === 2);
   check('new song appended to the queue', (await evaluate('Player.state.queue.length')) === 2);
 
   /* adding the same file twice is ignored */
@@ -560,7 +560,7 @@ async function main() {
   check('duplicate file is skipped', (await evaluate('Library.tracks.length')) === 2);
 
   /* ---------- 7b. right-click menu in the song list ---------- */
-  const rowIds = await evaluate(`Array.from(document.querySelectorAll('.row')).map((r) => r.dataset.id)`);
+  const rowIds = await evaluate(`Array.from(document.querySelectorAll('#list .row')).map((r) => r.dataset.id)`);
   const menuTarget = rowIds[0];
   const menuCurrent = rowIds[1];
   /* The target sits first and the current song second, so the target is
@@ -570,8 +570,7 @@ async function main() {
   );
   await sleep(300);
 
-  /* A liked song keeps its filled heart visible even when the mouse is away.
-     The remove button stays hidden until the row is hovered. */
+  /* The heart and the delete button are always visible, with no hover step. */
   const favVis = await evaluate(`(async () => {
     const rows = Array.from(document.querySelectorAll('#list .row'));
     const row = rows.find((r) => !r.classList.contains('is-current'));
@@ -593,8 +592,8 @@ async function main() {
     return out;
   })()`);
   check(
-    'a liked row keeps its heart visible without hover',
-    favVis.ok && favVis.heart === '1' && favVis.trash === '0' && favVis.on,
+    'row actions stay visible without hover',
+    favVis.ok && favVis.heart === '1' && favVis.trash === '1' && favVis.on,
     JSON.stringify(favVis)
   );
 
@@ -625,7 +624,7 @@ async function main() {
   );
 
   await evaluate(`(() => {
-    const row = document.querySelectorAll('.row')[0];
+    const row = document.querySelectorAll('#list .row')[0];
     const box = row.getBoundingClientRect();
     row.dispatchEvent(new MouseEvent('contextmenu', {
       bubbles: true, cancelable: true,
@@ -673,12 +672,38 @@ async function main() {
   await sleep(350);
   const queueOpen = await evaluate(`({
     open: document.getElementById('queue').classList.contains('is-open'),
-    rows: document.querySelectorAll('.q-row').length,
+    rows: document.querySelectorAll('#queue [data-qid]').length,
     meta: document.getElementById('queueMeta').textContent,
     scrim: document.getElementById('scrim').classList.contains('is-open')
   })`);
   check('queue drawer opens', queueOpen.open && queueOpen.rows === 2, queueOpen.meta);
   check('scrim shown with drawer', queueOpen.scrim);
+
+  /* The drawer rows use the same grid as the list, and the shuffle button is
+     small with a small gap under it. */
+  const drawerLook = await evaluate(`(() => {
+    const row = document.querySelector('#queue [data-qid]');
+    const listRow = document.querySelector('#list .row');
+    const btn = document.getElementById('btnQueueShuffle');
+    const drawer = document.getElementById('queue');
+    return {
+      height: row ? Math.round(row.getBoundingClientRect().height) : 0,
+      listHeight: listRow ? Math.round(listRow.getBoundingClientRect().height) : 0,
+      heart: !!(row && row.querySelector('[data-row-action="fav"]')),
+      btnHeight: Math.round(btn.getBoundingClientRect().height),
+      gap: Math.round(drawer.getBoundingClientRect().bottom - btn.getBoundingClientRect().bottom)
+    };
+  })()`);
+  check(
+    'queue drawer rows match the list',
+    drawerLook.height > 0 && drawerLook.height === drawerLook.listHeight && drawerLook.heart,
+    JSON.stringify(drawerLook)
+  );
+  check(
+    'queue shuffle is small and near the bottom',
+    drawerLook.btnHeight <= 34 && drawerLook.gap >= 5 && drawerLook.gap <= 9,
+    JSON.stringify(drawerLook)
+  );
   /* keyboard reorder of a queue row */
   const kbResult = await evaluate(`(async () => {
     const drawer = document.querySelector('#queue');
@@ -697,7 +722,7 @@ async function main() {
   /* dragging a queue row reorders the play order */
   const dragResult = await evaluate(`(async () => {
     const handle = document.querySelector('#queue .q-drag');
-    const rows = Array.from(document.querySelectorAll('#queue .q-row'));
+    const rows = Array.from(document.querySelectorAll('#queue [data-qid]'));
     if (!handle || rows.length < 2) return { ok: false, reason: 'no rows' };
     const r0 = rows[0].getBoundingClientRect();
     const r1 = rows[1].getBoundingClientRect();
@@ -708,11 +733,11 @@ async function main() {
     const midY = r1.top + r1.height / 2 + 40;
     handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 1, clientX: cx, clientY: midY }));
     await new Promise((r) => setTimeout(r, 60));
-    const live = document.querySelector('#queue .q-row.is-dragging');
+    const live = document.querySelector('#queue [data-qid].is-dragging');
     const animation = {
       dragging: !!live,
       follows: live ? /translateY\\(\\d+(\\.\\d+)?px\\)/.test(live.style.transform || '') : false,
-      shifted: Array.from(document.querySelectorAll('#queue .q-row')).filter((r) => r !== live && r.style.transform).length
+      shifted: Array.from(document.querySelectorAll('#queue [data-qid]')).filter((r) => r !== live && r.style.transform).length
     };
     handle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, clientX: cx, clientY: midY }));
     await new Promise((r) => setTimeout(r, 420));
@@ -732,7 +757,7 @@ async function main() {
 
   /* the same menu works inside the queue drawer */
   await evaluate(`(() => {
-    const row = document.querySelector('.q-row');
+    const row = document.querySelector('#queue [data-qid]');
     const box = row.getBoundingClientRect();
     row.dispatchEvent(new MouseEvent('contextmenu', {
       bubbles: true, cancelable: true,
@@ -758,18 +783,20 @@ async function main() {
   await sleep(300);
 
   /* The Playing queue tab must look like All songs: same row height,
-     same cover size, and the drag grip must be a real icon. */
+     same cover size, a heart, and the drag grip must be a real icon. */
   const queueView = await evaluate(`(async () => {
     document.querySelector('[data-view="queue"]').click();
     await new Promise((r) => setTimeout(r, 400));
-    const row = document.querySelector('#list .q-row');
+    const row = document.querySelector('#list [data-qid]');
     const grip = row && row.querySelector('.q-drag use');
     const info = {
       title: document.getElementById('viewTitle').textContent,
-      rows: document.querySelectorAll('#list .q-row').length,
+      rows: document.querySelectorAll('#list [data-qid]').length,
       height: row ? Math.round(row.getBoundingClientRect().height) : 0,
-      thumb: row ? Math.round(row.querySelector('.q-thumb').getBoundingClientRect().width) : 0,
+      thumb: row ? Math.round(row.querySelector('.thumb').getBoundingClientRect().width) : 0,
       grip: grip ? grip.getAttribute('href') : null,
+      heart: !!(row && row.querySelector('[data-row-action="fav"]')),
+      cells: row ? row.children.length : 0,
       headHidden: document.querySelector('.list-head').hidden,
       sortHidden: document.querySelector('.sort').hidden
     };
@@ -777,13 +804,13 @@ async function main() {
     input.value = 'zzz';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await new Promise((r) => setTimeout(r, 360));
-    info.filtered = document.querySelectorAll('#list .q-row').length;
+    info.filtered = document.querySelectorAll('#list [data-qid]').length;
     info.filteredEmpty = !document.getElementById('empty').hidden;
     info.gripWhileFiltered = !!document.querySelector('#list .q-drag');
     input.value = '';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await new Promise((r) => setTimeout(r, 360));
-    info.restored = document.querySelectorAll('#list .q-row').length;
+    info.restored = document.querySelectorAll('#list [data-qid]').length;
     document.querySelector('[data-view="all"]').click();
     await new Promise((r) => setTimeout(r, 350));
     info.rowHeight = Math.round(document.querySelector('#list .row').getBoundingClientRect().height);
@@ -795,7 +822,9 @@ async function main() {
       queueView.rows === 2 &&
       queueView.height > 0 &&
       queueView.height === queueView.rowHeight &&
-      queueView.thumb === 40,
+      queueView.thumb === 40 &&
+      queueView.heart === true &&
+      queueView.cells === 4,
     JSON.stringify(queueView)
   );
   check('queue drag grip uses the real icon', queueView.grip === '#i-grip', queueView.grip);
@@ -861,6 +890,44 @@ async function main() {
     JSON.stringify(schemeDark)
   );
 
+  /* ---------- 8b. palette ---------- */
+  const paletteInfo = await evaluate(`(async () => {
+    const select = document.getElementById('palette');
+    const root = document.documentElement;
+    const before = {
+      attr: root.dataset.palette || '',
+      bg: getComputedStyle(document.body).backgroundColor,
+      accent: getComputedStyle(root).getPropertyValue('--accent').trim()
+    };
+    select.value = 'vercel';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 140));
+    const after = {
+      attr: root.dataset.palette,
+      bg: getComputedStyle(document.body).backgroundColor,
+      accent: getComputedStyle(root).getPropertyValue('--accent').trim(),
+      saved: JSON.parse(localStorage.getItem('aurora.v3.palette')),
+      theme: root.dataset.theme
+    };
+    select.value = 'default';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 140));
+    return { before: before, after: after, back: root.dataset.palette, options: select.options.length };
+  })()`);
+  check(
+    'palette select switches to vercel and back',
+    paletteInfo.options === 2 &&
+      paletteInfo.before.attr === 'default' &&
+      paletteInfo.after.attr === 'vercel' &&
+      paletteInfo.after.saved === 'vercel' &&
+      paletteInfo.after.theme === 'dark' &&
+      paletteInfo.after.accent === '#ffffff' &&
+      paletteInfo.after.bg === 'rgb(0, 0, 0)' &&
+      paletteInfo.before.bg !== paletteInfo.after.bg &&
+      paletteInfo.back === 'default',
+    JSON.stringify(paletteInfo)
+  );
+
   /* ---------- 9. keyboard shortcuts ---------- */
   await send('Page.bringToFront');
   await evaluate(`document.activeElement && document.activeElement.blur && document.activeElement.blur(); true`);
@@ -884,7 +951,7 @@ async function main() {
     favorite: Library.byId.get(Object.keys(Object.fromEntries(Library.byId))[0]).favorite,
     current: Player.state.currentId,
     barTitle: document.getElementById('npTitle').textContent,
-    rows: document.querySelectorAll('.row').length,
+    rows: document.querySelectorAll('#list .row').length,
     sort: document.getElementById('sort').value,
     theme: document.documentElement.dataset.theme,
     paused: Player.audio.paused,
@@ -899,7 +966,7 @@ async function main() {
   check('position restored', afterReload.position > 0.8, afterReload.position);
 
   /* ---------- 11. remove + clear ---------- */
-  await evaluate(`document.querySelector('.row [data-row-action="remove"]').click()`);
+  await evaluate(`document.querySelector('#list .row [data-row-action="remove"]').click()`);
   await waitFor('Library.tracks.length === 1', 8000, 'remove');
   check('remove deletes a song', (await evaluate('Library.tracks.length')) === 1);
 

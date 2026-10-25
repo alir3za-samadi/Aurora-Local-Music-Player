@@ -254,17 +254,18 @@
     const currentId = Player.state.currentId;
     const playing = Player.isPlaying;
 
-    U.$$('.row', els.list).forEach((row) => {
+    U.$$('.row[data-id]', els.list).forEach((row) => {
       const isCurrent = row.dataset.id === currentId;
       row.classList.toggle('is-current', isCurrent);
       row.classList.toggle('is-playing', isCurrent && playing);
       row.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
     });
 
-    U.$$('.q-row').forEach((row) => {
+    U.$$('[data-qid]').forEach((row) => {
       const isCurrent = row.dataset.qid === currentId;
       row.classList.toggle('is-current', isCurrent);
       row.classList.toggle('is-playing', isCurrent && playing);
+      row.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
     });
   }
 
@@ -521,21 +522,31 @@
     updateHeader();
   }
 
-  /** Build one queue row. Used by the drawer and by the Playing queue view. */
+  /** Build one queue row. It uses the same grid as the library rows, so the
+      Playing queue view and the drawer look like the All songs list. */
   function queueRowFor(id, withGrip) {
     const track = Library.byId.get(id);
     if (!track) return null;
     const isCurrent = id === Player.state.currentId;
+
     const row = U.el('div', {
-      class: 'q-row' + (isCurrent ? ' is-current' : ''),
+      class:
+        'row' +
+        (isCurrent ? ' is-current' : '') +
+        (isCurrent && Player.isPlaying ? ' is-playing' : '') +
+        (track.favorite ? ' has-favorite' : ''),
       dataset: { qid: id },
-      role: 'button',
+      role: 'option',
       tabindex: '0',
+      'aria-selected': isCurrent ? 'true' : 'false',
       'aria-label': 'Play ' + track.title,
     });
+
+    /* The index cell holds the grip. It stays visible, so a drag never
+       depends on hover and works on a touch screen too. */
+    const idx = U.el('div', { class: 'cell idx' });
     if (withGrip === false) {
-      /* Keep the cover in the same place when the grip is hidden. */
-      row.appendChild(U.el('span', { class: 'q-gap', 'aria-hidden': 'true' }));
+      idx.appendChild(U.el('span', { class: 'q-gap', 'aria-hidden': 'true' }));
     } else {
       const handle = U.el('button', { class: 'q-drag', 'aria-label': 'Reorder in queue', title: 'Drag to reorder', dataset: { drag: 'true' } }, [U.icon('grip')]);
       handle.addEventListener('keydown', (event) => {
@@ -543,7 +554,7 @@
         event.preventDefault();
         const list = row.parentElement;
         if (!list) return;
-        const rows = Array.from(list.querySelectorAll('.q-row'));
+        const rows = Array.from(list.querySelectorAll('[data-qid]'));
         const index = rows.indexOf(row);
         const target = event.key === 'ArrowUp' ? index - 1 : index + 1;
         if (target < 0 || target >= rows.length) return;
@@ -552,17 +563,47 @@
         applyQueueOrder(list);
         handle.focus();
       });
-      row.appendChild(handle);
+      idx.appendChild(handle);
     }
-    row.appendChild(thumbNode(track, 'q-thumb'));
-    row.appendChild(U.el('div', { class: 'q-text' }, [U.el('div', { class: 'q-title', text: track.title })]));
-    row.appendChild(U.el('span', { class: 'q-time', text: U.fmtTime(track.duration) }));
-    row.appendChild(U.el('button', { class: 'icon-btn', dataset: { rowAction: 'qremove', id: track.id }, 'aria-label': 'Remove from queue', title: 'Remove from queue' }, [U.icon('x')]));
+
+    const titleCell = U.el('div', { class: 'cell title-cell' }, [
+      thumbNode(track),
+      U.el('div', { class: 'title-text' }, [U.el('div', { class: 'title', text: track.title })]),
+    ]);
+
+    const fav = U.el(
+      'button',
+      {
+        class: 'icon-btn fav-btn' + (track.favorite ? ' is-on' : ''),
+        dataset: { rowAction: 'fav', id: track.id },
+        'aria-label': track.favorite ? 'Remove from favorites' : 'Add to favorites',
+        'aria-pressed': String(Boolean(track.favorite)),
+        title: 'Favorite (F)',
+      },
+      [U.icon('heart')]
+    );
+
+    const remove = U.el(
+      'button',
+      {
+        class: 'icon-btn',
+        dataset: { rowAction: 'qremove', id: track.id },
+        'aria-label': 'Remove from queue',
+        title: 'Remove from queue',
+      },
+      [U.icon('x')]
+    );
+
+    row.appendChild(idx);
+    row.appendChild(titleCell);
+    row.appendChild(U.el('div', { class: 'cell time', text: U.fmtTime(track.duration) }));
+    row.appendChild(U.el('div', { class: 'cell actions' }, [fav, remove]));
+
     return row;
   }
 
   function applyQueueOrder(list) {
-    const ids = Array.from(list.querySelectorAll('.q-row')).map((row) => row.dataset.qid);
+    const ids = Array.from(list.querySelectorAll('[data-qid]')).map((row) => row.dataset.qid);
     if (!ids.length) return;
     Player.setQueue(ids);
   }
@@ -574,12 +615,12 @@
     const handle = event.target && event.target.closest && event.target.closest('[data-drag]');
     if (!handle) return;
     if (event.button !== undefined && event.button !== 0) return;
-    const row = handle.closest('.q-row');
+    const row = handle.closest('[data-qid]');
     if (!row) return;
     const list = row.parentElement;
     if (!list) return;
 
-    const rows = Array.from(list.querySelectorAll('.q-row'));
+    const rows = Array.from(list.querySelectorAll('[data-qid]'));
     const fromIndex = rows.indexOf(row);
     if (fromIndex < 0 || rows.length < 2) return;
 
@@ -782,7 +823,7 @@
     els.queue.classList.add('is-open');
     els.queue.setAttribute('aria-hidden', 'false');
     showScrim(els.scrim);
-    const current = els.queueList.querySelector('.q-row.is-current');
+    const current = els.queueList.querySelector('[data-qid].is-current');
     if (current) current.scrollIntoView({ block: 'center' });
   }
 
@@ -896,14 +937,15 @@
     if (state.view === 'favorites') {
       renderList(true);
     } else {
-      U.$$('.row', els.list).forEach((row) => {
-        if (row.dataset.id !== id) return;
-        row.classList.toggle('has-favorite', value);
-        const button = row.querySelector('[data-row-action="fav"]');
-        if (!button) return;
+      /* The same song can be on screen more than once: in the list, in the
+         queue view, and in the drawer. Update every copy. */
+      U.$$('[data-row-action="fav"]').forEach((button) => {
+        if (button.dataset.id !== id) return;
         button.classList.toggle('is-on', value);
         button.setAttribute('aria-pressed', String(value));
         button.setAttribute('aria-label', value ? 'Remove from favorites' : 'Add to favorites');
+        const row = button.closest('.row');
+        if (row) row.classList.toggle('has-favorite', value);
       });
       updateHeader();
     }
@@ -1185,15 +1227,45 @@
   /* =========================================================
      Theme + prefs
      ========================================================= */
+  const META_COLORS = {
+    'default-dark': '#08080d',
+    'default-light': '#f2f3f9',
+    'vercel-dark': '#000000',
+    'vercel-light': '#ffffff',
+  };
+
+  function applyMetaColor() {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const root = document.documentElement;
+    const key = (root.dataset.palette || 'default') + '-' + (root.dataset.theme || 'dark');
+    meta.setAttribute('content', META_COLORS[key] || META_COLORS['default-dark']);
+  }
+
+  function updateThemeLabel() {
+    if (!els.btnTheme) return;
+    const light = document.documentElement.dataset.theme === 'light';
+    els.btnTheme.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
+  }
+
   function setTheme(theme) {
     document.documentElement.dataset.theme = theme;
     U.store.set('theme', theme);
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#f2f3f9' : '#08080d');
+    applyMetaColor();
+    updateThemeLabel();
   }
 
   function toggleTheme() {
     setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+  }
+
+  /** Palette is a second axis: dark or light stays, the colors change. */
+  function setPalette(palette) {
+    const value = palette === 'vercel' ? 'vercel' : 'default';
+    document.documentElement.dataset.palette = value;
+    U.store.set('palette', value);
+    if (els.palette) els.palette.value = value;
+    applyMetaColor();
   }
 
   function setView(view) {
@@ -1317,14 +1389,14 @@
         return;
       }
 
-      const queueRow = target.closest && target.closest('.q-row');
+      const queueRow = target.closest && target.closest('[data-qid]');
       if (queueRow) {
         Player.load(queueRow.dataset.qid, { autoplay: true });
         return;
       }
 
       const row = target.closest && target.closest('.row');
-      if (row) playRow(row.dataset.id);
+      if (row && row.dataset.id) playRow(row.dataset.id);
     });
 
     /* Dragging a queue row reorders the play order. */
@@ -1335,13 +1407,13 @@
     /* Right-click opens the song menu, in the list and in the queue drawer. */
     document.addEventListener('contextmenu', (event) => {
       const target = event.target;
-      const row = target.closest && target.closest('.row');
-      if (row) {
-        openContextMenu(event, row.dataset.id, 'list');
+      const queueRow = target.closest && target.closest('[data-qid]');
+      if (queueRow) {
+        openContextMenu(event, queueRow.dataset.qid, 'queue');
         return;
       }
-      const queueRow = target.closest && target.closest('.q-row');
-      if (queueRow) openContextMenu(event, queueRow.dataset.qid, 'queue');
+      const row = target.closest && target.closest('.row');
+      if (row && row.dataset.id) openContextMenu(event, row.dataset.id, 'list');
     });
 
     /* ---------- sidebar / nav ---------- */
@@ -1357,8 +1429,9 @@
     els.scrim.addEventListener('click', closePanels);
     els.scrimSidebar.addEventListener('click', closeSidebar);
 
-    /* ---------- theme, help, clear ---------- */
+    /* ---------- theme, palette, help, clear ---------- */
     els.btnTheme.addEventListener('click', toggleTheme);
+    els.palette.addEventListener('change', () => setPalette(els.palette.value));
     els.btnHelp.addEventListener('click', () => els.helpDialog.showModal());
     els.btnClear.addEventListener('click', clearLibrary);
 
@@ -1400,15 +1473,23 @@
     /* Keyboard support for the rows (they are divs, not buttons). */
     els.list.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (event.target.closest('[data-drag]')) return;
+      const queueRow = event.target.closest('[data-qid]');
+      if (queueRow) {
+        event.preventDefault();
+        Player.load(queueRow.dataset.qid, { autoplay: true });
+        return;
+      }
       const row = event.target.closest('.row');
-      if (!row) return;
+      if (!row || !row.dataset.id) return;
       event.preventDefault();
       playRow(row.dataset.id);
     });
 
     els.queueList.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
-      const row = event.target.closest('.q-row');
+      if (event.target.closest('[data-drag]')) return;
+      const row = event.target.closest('[data-qid]');
       if (!row) return;
       event.preventDefault();
       Player.load(row.dataset.qid, { autoplay: true });
@@ -1678,6 +1759,7 @@
     els.btnMenu = U.$('#btnMenu');
     els.btnCloseSidebar = U.$('#btnCloseSidebar');
     els.btnTheme = U.$('#btnTheme');
+    els.palette = U.$('#palette');
     els.btnHelp = U.$('#btnHelp');
     els.btnClear = U.$('#btnClear');
     els.btnQueueShuffle = U.$('#btnQueueShuffle');
@@ -1721,6 +1803,13 @@
     state.sort = els.sort.querySelector('option[value="' + savedSort + '"]') ? savedSort : 'added-desc';
     els.sort.value = state.sort;
 
+    const savedPalette = U.store.get('palette', 'default');
+    const paletteValue = els.palette.querySelector('option[value="' + savedPalette + '"]')
+      ? savedPalette
+      : 'default';
+    els.palette.value = paletteValue;
+    document.documentElement.dataset.palette = paletteValue;
+
     els.scrim.hidden = false;
     els.scrimSidebar.hidden = false;
     bindEvents();
@@ -1737,9 +1826,8 @@
     renderPlayer();
     updateHeader();
     refreshStorage();
-    if (document.documentElement.dataset.theme === 'light') {
-      els.btnTheme.setAttribute('aria-label', 'Switch to dark theme');
-    }
+    updateThemeLabel();
+    applyMetaColor();
   }
 
   window.UI = {
@@ -1753,6 +1841,7 @@
     toast,
     importFiles,
     setTheme,
+    setPalette,
     visibleIds: () => state.visible.map((track) => track.id),
   };
 })();
