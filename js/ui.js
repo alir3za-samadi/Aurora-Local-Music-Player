@@ -338,8 +338,13 @@
     const max = Number(input.max) || 100;
     const value = Number(input.value);
     const thumb = 11;
-    const usable = input.clientWidth - thumb;
-    const x = thumb / 2 + ((value - min) / (max - min || 1)) * usable;
+    const usable = Math.max(0, input.clientWidth - thumb);
+    const ratio = (value - min) / (max - min || 1);
+    /* The label lives in .volume, which also holds the mute button. Measure
+       the real gap between the two boxes, or the label sits too far left. */
+    const parentBox = input.parentElement.getBoundingClientRect();
+    const inputBox = input.getBoundingClientRect();
+    const x = inputBox.left - parentBox.left + thumb / 2 + ratio * usable;
     label.style.left = (Number.isFinite(x) ? x : 0) + 'px';
   }
 
@@ -371,14 +376,6 @@
     });
   }
 
-  function renderSpeed() {
-    U.$$('.speed-select').forEach((select) => {
-      const value = String(Player.state.speed);
-      if (select.value !== value) select.value = value;
-      select.setAttribute('aria-label', 'Playback speed: ' + value + 'x');
-    });
-  }
-
   function renderPlayer() {
     const track = Player.track;
     const playing = Player.isPlaying;
@@ -393,7 +390,10 @@
     els.npTitle.textContent = track ? track.title : 'Nothing playing';
     els.bigTitle.textContent = track ? track.title : 'Nothing playing';
 
-    U.$$('.fav-btn').forEach((button) => {
+    /* Only the player bar and the now-playing sheet show the current song's
+       heart here. Row hearts are owned by the list, so a global .fav-btn
+       selector would mark every row as liked. */
+    U.$$('[data-act="favorite"]').forEach((button) => {
       const on = Boolean(track && track.favorite);
       button.classList.toggle('is-on', on);
       button.setAttribute('aria-pressed', String(on));
@@ -403,7 +403,6 @@
     setArtwork(track);
     renderModes();
     renderVolume();
-    renderSpeed();
   }
 
   function renderTime(current, duration) {
@@ -568,6 +567,9 @@
     Player.setQueue(ids);
   }
 
+  /* Drag a queue row. The picked row follows the pointer, and the rows that
+     lose their place slide one slot away. The list order is only written to
+     the Player after the small settle animation, so the DOM never jumps. */
   function startQueueDrag(event) {
     const handle = event.target && event.target.closest && event.target.closest('[data-drag]');
     if (!handle) return;
@@ -577,41 +579,100 @@
     const list = row.parentElement;
     if (!list) return;
 
-    const initialOrder = Array.from(list.querySelectorAll('.q-row')).map((r) => r.dataset.qid).join('|');
-    let moved = false;
+    const rows = Array.from(list.querySelectorAll('.q-row'));
+    const fromIndex = rows.indexOf(row);
+    if (fromIndex < 0 || rows.length < 2) return;
+
+    const startY = event.clientY;
+    const boxes = rows.map((item) => item.getBoundingClientRect());
+    const rowH = Math.max(1, (boxes[1].top - boxes[0].top) || boxes[0].height);
+    let targetIndex = fromIndex;
+    let done = false;
 
     event.preventDefault();
     /* Capture keeps the move events on the handle. The document listeners
        below also work when capture is not available (touch, old browsers). */
     try { handle.setPointerCapture(event.pointerId); } catch (e) { /* ignore */ }
     row.classList.add('is-dragging');
+    row.style.transition = 'none';
 
-    const move = (pointerEvent) => {
-      const siblings = Array.from(list.querySelectorAll('.q-row')).filter((item) => item !== row);
-      const target = siblings.find((item) => {
-        const box = item.getBoundingClientRect();
-        return pointerEvent.clientY < box.top + box.height / 2;
-      });
-      if (target) list.insertBefore(row, target);
-      else list.insertBefore(row, list.querySelector('.queue-view-foot') || null);
-      moved = true;
+    /* Move one row out of the way. A short transition makes the change
+       readable; without it the list would look like it teleports. */
+    const shiftRow = (item, offset) => {
+      item.style.transition = 'transform 160ms var(--ease)';
+      item.style.transform = offset ? 'translateY(' + offset + 'px)' : '';
     };
 
-    const end = () => {
+    const paint = (dy) => {
+      row.style.transform = 'translateY(' + dy + 'px)';
+      const next = Math.max(0, Math.min(rows.length - 1, fromIndex + Math.round(dy / rowH)));
+      if (next === targetIndex) return;
+      targetIndex = next;
+      rows.forEach((item, index) => {
+        if (item === row) return;
+        let offset = 0;
+        if (fromIndex < targetIndex && index > fromIndex && index <= targetIndex) offset = -rowH;
+        else if (targetIndex < fromIndex && index >= targetIndex && index < fromIndex) offset = rowH;
+        shiftRow(item, offset);
+      });
+    };
+
+    const resetRows = () => {
+      rows.forEach((item) => {
+        item.style.transition = 'none';
+        item.style.transform = '';
+      });
+      row.classList.remove('is-dragging');
+    };
+
+    const commit = () => {
+      if (targetIndex === fromIndex) {
+        resetRows();
+        return;
+      }
+      const ids = rows.map((item) => item.dataset.qid);
+      const movedId = ids.splice(fromIndex, 1)[0];
+      ids.splice(targetIndex, 0, movedId);
+      const byId = new Map(rows.map((item) => [item.dataset.qid, item]));
+      const foot = list.querySelector('.queue-view-foot');
+      ids.forEach((id) => {
+        const node = byId.get(id);
+        if (node) list.insertBefore(node, foot || null);
+      });
+      resetRows();
+      applyQueueOrder(list);
+    };
+
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
       document.removeEventListener('pointermove', move);
       document.removeEventListener('pointerup', end);
-      document.removeEventListener('pointercancel', end);
+      document.removeEventListener('pointercancel', cancel);
       row.classList.remove('is-dragging');
-      const newOrder = Array.from(list.querySelectorAll('.q-row')).map((r) => r.dataset.qid).join('|');
-      if (moved && newOrder !== initialOrder) {
-        queueDragEndAt = Date.now();
-        applyQueueOrder(list);
-      }
+      /* The click that follows a release must not start a song. */
+      queueDragEndAt = Date.now();
+      row.style.transition = 'transform 180ms var(--ease)';
+      row.style.transform = keep
+        ? 'translateY(' + (targetIndex - fromIndex) * rowH + 'px)'
+        : '';
+      window.setTimeout(() => {
+        if (keep) commit();
+        else resetRows();
+      }, 190);
     };
+
+    const move = (pointerEvent) => {
+      if (done) return;
+      paint(pointerEvent.clientY - startY);
+    };
+
+    const end = () => finish(true);
+    const cancel = () => finish(false);
 
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', end);
-    document.addEventListener('pointercancel', end);
+    document.addEventListener('pointercancel', cancel);
   }
 
   /* =========================================================
@@ -1281,14 +1342,6 @@
       }
       const queueRow = target.closest && target.closest('.q-row');
       if (queueRow) openContextMenu(event, queueRow.dataset.qid, 'queue');
-    });
-
-    /* Speed dropdown */
-    U.$$('.speed-select').forEach((select) => {
-      select.value = String(Player.state.speed);
-      select.addEventListener('change', (e) => {
-        Player.setSpeed(Number(e.target.value));
-      });
     });
 
     /* ---------- sidebar / nav ---------- */

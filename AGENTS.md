@@ -48,7 +48,7 @@ one global at the end.
 | 1 | `js/util.js` | `U` | DOM helpers, `U.store` (localStorage), time format, thumbnail, duration probe |
 | 2 | `js/db.js` | `DB` | IndexedDB: `tracks`, `files`, `art` |
 | 3 | `js/tags.js` | `Tags` | ID3v1/v2, FLAC Vorbis, MP4 `ilst` readers. The app only uses the cover picture. |
-| 4 | `js/player.js` | `Player` | one `<audio>` element, queue, shuffle, repeat, speed, Media Session, art cache, Web Audio visualizer |
+| 4 | `js/player.js` | `Player` | one `<audio>` element, queue, shuffle, repeat, Media Session, art cache, Web Audio visualizer |
 | 5 | `js/library.js` | `Library`, `isAudioFile` | import pipeline, search, sort, duplicate keys |
 | 6 | `js/ui.js` | `UI` | all rendering, all events, the song menu, keyboard shortcuts, toasts, visualizer drawing |
 | 7 | `js/app.js` | — | startup order, saved state, throttled saving |
@@ -101,10 +101,12 @@ Key prefix `aurora.v3.` (defined once in `util.js` as `U.store`). Access it thro
 `aurora.v3.state` holds:
 
 ```js
-{ trackId, position, volume, muted, speed, repeat, shuffle, queue }
+{ trackId, position, volume, muted, repeat, shuffle, queue }
 ```
 
 `queue` is capped at 1000 ids to keep the value small.
+
+An older saved state may still hold a `speed` value. It is ignored, not an error.
 
 A saved sort value that no longer exists (from an older version) is not an error.
 `ui.js` only accepts a value that is present as an `<option>`, so anything else falls
@@ -194,6 +196,10 @@ The queue is also written to localStorage, so a reload continues in the same ord
   available. Both paths end in `applyQueueOrder`, which calls `Player.setQueue(ids)`.
   Only reorder when the order actually changed. A finished drag sets `queueDragEndAt`,
   so the click that follows does not also start the song.
+  During a drag the list order is not touched. The dragged row follows the pointer with
+  a `translateY`, and the rows that lose their slot slide by one row height with a
+  160 ms transform. The new order is written to `Player` only after the dragged row
+  settles into the gap, so the DOM never jumps under the pointer.
 - **Fonts are self-hosted.** Inter covers Latin; Vazirmatn (variable woff2) covers the
   Arabic block via `unicode-range`. Add a new script only if the user asks; the
   `--font` stack is the single place to change the order.
@@ -234,10 +240,10 @@ Keep these in mind before you "fix" something.
   toast that tells the user to open the file in Chrome or Edge.
 - **Quota errors are their own case.** A full disk shows a specific message, not the
   generic "import failed" one.
-- **Native dropdowns need `color-scheme`.** The sort and speed `<select>` popups are
-  drawn by the operating system, not by CSS. Without `color-scheme: dark` on
-  `[data-theme='dark']`, the popup is white with light text. The token lives in the
-  theme blocks, so a new theme must set it too.
+- **Native dropdowns need `color-scheme`.** The sort `<select>` popup is drawn by the
+  operating system, not by CSS. Without `color-scheme: dark` on `[data-theme='dark']`,
+  the popup is white with light text. The token lives in the theme blocks, so a new
+  theme must set it too.
 - **The cover gradient needs both lightness tokens.** `[data-theme='dark']` overrides
   `--grad-l1` / `--grad-l2` to darker values, and `[data-theme='light']` to lighter
   ones. The base `:root` values are the fallback only.
@@ -248,6 +254,14 @@ Keep these in mind before you "fix" something.
 - **The menu closes on the next document click.** The item's own handler runs first, so
   the action happens before the close. A new item that needs the menu to stay open must
   stop the event.
+- **`.fav-btn` is on every row.** `renderPlayer` used that selector once, so the current
+  song's like was painted on all row hearts. The player bar and the now-playing sheet
+  are the only places with `data-act="favorite"`; rows use `data-row-action="fav"`.
+  Never target `.fav-btn` from code that sets the current song.
+- **`.vol-pct` is a child of `.volume`, not of the slider.** `.volume` starts with the
+  mute button, so `input.clientWidth` alone puts the label too far left. `placeVolPct`
+  measures both boxes with `getBoundingClientRect` and adds the gap. Inside the slider,
+  the thumb centre is `thumb / 2 + ratio * (width - thumb)`.
 
 ---
 
@@ -260,7 +274,7 @@ cd "C:\Users\Alir3za\Downloads\Music Player\V3"
 node tools/browser-test.js
 ```
 
-- Expected result: `72/72 checks passed` and `console errors: 0`.
+- Expected result: `76/76 checks passed` and `console errors: 0`.
 - The test starts its own headless Chrome with its own profile under `tools/.tmp/`,
   so it never touches the songs in the real browser profile.
 - It builds its own audio files in memory: a 2 s WAV, a 3 s WAV, and an MP3 with a
@@ -268,9 +282,10 @@ node tools/browser-test.js
   shipping test files.
 - It also checks that the library survives a reload, that the position is restored,
   that the visualizer paints pixels, that the mobile drawer opens, that `color-scheme`
-  follows the theme, that the song menu moves a song with "Play next", that the speed
-  drop-down sets the playback rate, and that a cover placeholder is a gradient with
-  nothing drawn on top.
+  follows the theme, that the song menu moves a song with "Play next", that a drag moves
+  the row and shifts its neighbours, that a like touches only one row, that the volume
+  label sits on the thumb, and that a cover placeholder is a gradient with nothing drawn
+  on top.
 - It checks the row shape too: the title is the file name, the row has four cells, and
   there is no artist, album, or "showing N of M" line.
 - It writes five screenshots into `tools/.tmp/`.

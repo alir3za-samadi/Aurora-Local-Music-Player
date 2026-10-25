@@ -473,31 +473,11 @@ async function main() {
   await sleep(250);
   check('pause works', await evaluate('Player.audio.paused'));
 
-  /* ---------- 4b. speed dropdown and volume percent ---------- */
-  const speedInfo = await evaluate(`(() => {
-    const select = document.querySelector('.player .speed-select');
-    const before = Player.state.speed;
-    select.value = '1.5';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return {
-      before: before,
-      after: Player.state.speed,
-      rate: Player.audio.playbackRate,
-      options: select.options.length,
-      tag: select.tagName
-    };
-  })()`);
+  /* ---------- 4b. no speed control, volume percent ---------- */
   check(
-    'speed is a dropdown that sets the rate',
-    speedInfo.tag === 'SELECT' && speedInfo.options === 6 && speedInfo.after === 1.5 && Math.abs(speedInfo.rate - 1.5) < 0.001,
-    JSON.stringify(speedInfo)
+    'playback speed control is gone',
+    (await evaluate(`document.querySelector('.speed-select') === null && !('speed' in Player.state)`)) === true
   );
-  await evaluate(`(() => {
-    const select = document.querySelector('.player .speed-select');
-    select.value = '1';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
-  await sleep(120);
 
   const volPctAway = await evaluate(`getComputedStyle(document.querySelector('.player .vol-pct')).opacity`);
   await evaluate(
@@ -521,6 +501,32 @@ async function main() {
     'volume percent hides again',
     (await evaluate(`getComputedStyle(document.querySelector('.player .vol-pct')).opacity`)) === '0'
   );
+
+  /* The label must sit on the white thumb, not on the middle of the bar. */
+  const volAlign = await evaluate(`(async () => {
+    const input = document.querySelector('.player input.vol');
+    input.value = '65';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
+    const label = document.querySelector('.player .vol-pct');
+    const box = input.getBoundingClientRect();
+    const group = document.querySelector('.player .volume').getBoundingClientRect();
+    const thumb = 11;
+    const want = box.left - group.left + thumb / 2 + 0.65 * (input.clientWidth - thumb);
+    const have = parseFloat(label.style.left);
+    return { want: Math.round(want * 10) / 10, have: Math.round(have * 10) / 10, text: label.textContent };
+  })()`);
+  check(
+    'volume percent sits on the thumb',
+    Math.abs(volAlign.want - volAlign.have) < 0.6 && volAlign.text === '65%',
+    JSON.stringify(volAlign)
+  );
+  await evaluate(`(() => {
+    const input = document.querySelector('.player input.vol');
+    input.value = '100';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await sleep(80);
 
   /* ---------- 5. favorites ---------- */
   await evaluate(`document.querySelector('[data-row-action="fav"]').click()`);
@@ -590,6 +596,32 @@ async function main() {
     'a liked row keeps its heart visible without hover',
     favVis.ok && favVis.heart === '1' && favVis.trash === '0' && favVis.on,
     JSON.stringify(favVis)
+  );
+
+  /* Liking one row must not mark the rest. The player bar heart was once
+     written into every .fav-btn element, so all rows looked liked. */
+  const favScope = await evaluate(`(async () => {
+    const before = Library.tracks.filter((t) => t.favorite).map((t) => t.id).sort();
+    const rows = Array.from(document.querySelectorAll('#list .row'));
+    const target = rows.find((r) => !r.querySelector('[data-row-action="fav"]').classList.contains('is-on'));
+    if (!target) return { ok: false };
+    target.querySelector('[data-row-action="fav"]').click();
+    await new Promise((r) => setTimeout(r, 400));
+    const wantOn = before.concat(target.dataset.id).sort();
+    const on = Array.from(document.querySelectorAll('#list .row'))
+      .filter((r) => r.querySelector('[data-row-action="fav"]').classList.contains('is-on'))
+      .map((r) => r.dataset.id)
+      .sort();
+    const data = Library.tracks.filter((t) => t.favorite).map((t) => t.id).sort();
+    const live = document.querySelector('#list .row[data-id="' + target.dataset.id + '"]');
+    if (live) live.querySelector('[data-row-action="fav"]').click();
+    await new Promise((r) => setTimeout(r, 300));
+    return { ok: true, on: on, data: data, wantOn: wantOn };
+  })()`);
+  check(
+    'liking one row does not mark the others',
+    favScope.ok && JSON.stringify(favScope.on) === JSON.stringify(favScope.wantOn) && JSON.stringify(favScope.data) === JSON.stringify(favScope.wantOn),
+    JSON.stringify(favScope)
   );
 
   await evaluate(`(() => {
@@ -676,12 +708,23 @@ async function main() {
     const midY = r1.top + r1.height / 2 + 40;
     handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 1, clientX: cx, clientY: midY }));
     await new Promise((r) => setTimeout(r, 60));
+    const live = document.querySelector('#queue .q-row.is-dragging');
+    const animation = {
+      dragging: !!live,
+      follows: live ? /translateY\\(\\d+(\\.\\d+)?px\\)/.test(live.style.transform || '') : false,
+      shifted: Array.from(document.querySelectorAll('#queue .q-row')).filter((r) => r !== live && r.style.transform).length
+    };
     handle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, clientX: cx, clientY: midY }));
-    await new Promise((r) => setTimeout(r, 200));
-    return { ok: true, queue: Player.state.queue.slice(), ids: rows.map((r) => r.dataset.qid) };
+    await new Promise((r) => setTimeout(r, 420));
+    return { ok: true, animation: animation, queue: Player.state.queue.slice(), ids: rows.map((r) => r.dataset.qid) };
   })()`);
   const dragMoved = dragResult.ok && dragResult.queue.length === 2 && dragResult.queue[0] !== dragResult.ids[0];
   check('drag reorders the queue', dragMoved, JSON.stringify(dragResult.queue));
+  check(
+    'dragging animates the row and the shift',
+    dragResult.ok && dragResult.animation.dragging && dragResult.animation.follows && dragResult.animation.shifted > 0,
+    JSON.stringify(dragResult.animation)
+  );
   await evaluate('document.activeElement && document.activeElement.blur && document.activeElement.blur(); document.body.focus(); true');
   await sleep(200);
 

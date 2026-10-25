@@ -34,7 +34,6 @@ original files on disk are never changed, moved, or deleted.
   that is visible right now, so search and sort change the order.
 - 🎚️ **Now playing** — click the cover in the player bar for a full view with a live
   audio visualizer.
-- ⏩ **Playback speed** — a drop-down with 0.5x, 0.75x, 1x, 1.25x, 1.5x, and 2x.
 - 🔊 **Volume read-out** — the exact percentage appears above the slider knob while the
   pointer is over it, and follows the knob while dragging.
 - 🅰️ **Vazirmatn font** — Persian and Arabic text render correctly. The font ships
@@ -165,7 +164,7 @@ and playback starts.
 - The song list, with the duration and the added date.
 - Favorites.
 - The last song and the playback position.
-- The volume, the mute state, and the playback speed.
+- The volume and the mute state.
 - The shuffle and repeat mode.
 - The play order (the queue) at the moment you closed the page.
 - The current view, the sort mode, and the theme.

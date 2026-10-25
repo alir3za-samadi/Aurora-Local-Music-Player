@@ -49,7 +49,6 @@
     Player.hydrate({
       volume: typeof saved.volume === 'number' ? saved.volume : 1,
       muted: Boolean(saved.muted),
-      speed: typeof saved.speed === 'number' ? saved.speed : 1,
       repeat: saved.repeat || 'off',
       shuffle: Boolean(saved.shuffle),
     });
@@ -82,7 +81,6 @@
         position: Number(Player.audio.currentTime) || 0,
         volume: Player.state.volume,
         muted: Player.state.muted,
-        speed: Player.state.speed,
         repeat: Player.state.repeat,
         shuffle: Player.state.shuffle,
         queue: Player.state.queue.slice(0, 1000),

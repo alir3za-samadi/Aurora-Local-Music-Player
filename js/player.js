@@ -24,7 +24,6 @@
     shuffle: false,
     volume: 1,
     muted: false,
-    speed: 1,
     loading: false,
   };
 
@@ -204,7 +203,6 @@
     objectUrl = url;
 
     audio.src = url;
-    audio.playbackRate = state.speed;
     audio.load();
 
     emit('loading', false);
@@ -336,25 +334,16 @@
     setMuted(!state.muted);
   }
 
-  function setSpeed(value) {
-    const speed = Math.min(3, Math.max(0.25, Number(value) || 1));
-    state.speed = speed;
-    audio.playbackRate = speed;
-    emit('state');
-  }
-
   /** Apply saved settings without touching the queue. Used at startup. */
   function hydrate(settings) {
     const s = settings || {};
     if (typeof s.volume === 'number') state.volume = Math.min(1, Math.max(0, s.volume));
     if (typeof s.muted === 'boolean') state.muted = s.muted;
-    if (typeof s.speed === 'number') state.speed = Math.min(3, Math.max(0.25, s.speed));
     if (s.repeat === 'all' || s.repeat === 'one' || s.repeat === 'off') state.repeat = s.repeat;
     if (typeof s.shuffle === 'boolean') state.shuffle = s.shuffle;
 
     audio.volume = state.volume;
     audio.muted = state.muted;
-    audio.playbackRate = state.speed;
     emit('state');
   }
 
@@ -544,7 +533,7 @@
   });
 
   audio.addEventListener('ratechange', () => {
-    if (audio.playbackRate !== state.speed) audio.playbackRate = state.speed;
+    if (audio.playbackRate !== 1) audio.playbackRate = 1;
   });
 
   applyVolume();
@@ -580,7 +569,6 @@
     setVolume,
     toggleMute,
     setMuted,
-    setSpeed,
     hydrate,
     setLibrary,
     playIds,

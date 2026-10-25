@@ -1179,7 +1179,7 @@ input[type='range']::-moz-range-thumb {
   position: absolute;
   bottom: calc(100% + 6px);
   left: 0;
-  transform: translateX(-50%);
+  transform: translate(-50%, 4px);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--text);
@@ -1190,54 +1190,15 @@ input[type='range']::-moz-range-thumb {
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.12s var(--ease), left 0s;
+  transition: opacity 0.14s var(--ease), transform 0.14s var(--ease);
   z-index: 2;
 }
 .volume.is-dragging .vol-pct,
 .volume:hover .vol-pct,
 .vol-pct.is-visible {
   opacity: 1;
+  transform: translate(-50%, 0);
 }
-.speed {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.speed::after {
-  content: '';
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  margin-top: -4px;
-  border-right: 1.6px solid var(--muted);
-  border-bottom: 1.6px solid var(--muted);
-  transform: rotate(45deg);
-  pointer-events: none;
-}
-.speed-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--field);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 3px 20px 3px 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
-  min-width: 48px;
-  line-height: 1.2;
-}
-.speed-select:hover {
-  border-color: var(--muted-2);
-}
-.speed-select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 /* ---------- Now playing ---------- */
 .now-playing {
   position: fixed;
@@ -1493,8 +1454,15 @@ input[type='range']::-moz-range-thumb {
   color: var(--accent);
 }
 .q-row.is-dragging {
-  opacity: 0.5;
-  background: var(--hover);
+  position: relative;
+  z-index: 3;
+  background: var(--panel-2);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+  cursor: grabbing;
+  will-change: transform;
+}
+.q-row.is-dragging .q-drag {
+  cursor: grabbing;
 }
 .q-row .q-drag {
   width: 26px;
