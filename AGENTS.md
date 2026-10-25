@@ -184,18 +184,22 @@ The queue is also written to localStorage, so a reload continues in the same ord
   an icon inside a cover.
 - **The Playing queue view is a third view.** `state.view === 'queue'` renders the
   queue rows inside `#list`, with a shuffle footer. `renderList` returns early for it,
-  and `updateHeader` / `updateEmpty` have branches for it. Search and sort are hidden
-  in that view.
+  and `updateHeader` / `updateEmpty` have branches for it. The search box filters the
+  queue rows there. The sort dropdown is hidden, because the queue order is manual.
+  While a search is active the grip is hidden: a drag would read only the rows on
+  screen and drop the hidden ones.
 - **Queue rows can be reordered.** The grip button (`.q-drag`) drives `startQueueDrag`
-  with pointer events; Arrow Up / Down on the grip moves one step. Both paths end in
-  `applyQueueOrder`, which calls `Player.setQueue(ids)`. Only reorder when the order
-  actually changed.
+  with pointer events; Arrow Up / Down on the grip moves one step. The move and release
+  listeners live on `document`, so a drag still works when pointer capture is not
+  available. Both paths end in `applyQueueOrder`, which calls `Player.setQueue(ids)`.
+  Only reorder when the order actually changed. A finished drag sets `queueDragEndAt`,
+  so the click that follows does not also start the song.
 - **Fonts are self-hosted.** Inter covers Latin; Vazirmatn (variable woff2) covers the
   Arabic block via `unicode-range`. Add a new script only if the user asks; the
   `--font` stack is the single place to change the order.
-- **Icons are one SVG sprite** at the top of `index.html`. Use
-  `U.icon('i-play')` or `<svg class="icon"><use href="#i-play"/></svg>`. Do not add an
-  icon file.
+- **Icons are one SVG sprite** at the top of `index.html`. `U.icon` adds the `i-`
+  prefix itself, so call `U.icon('play')` for `#i-play`. The raw markup is
+  `<svg class="icon"><use href="#i-play"/></svg>`. Do not add an icon file.
 
 ---
 
@@ -203,6 +207,9 @@ The queue is also written to localStorage, so a reload continues in the same ord
 
 Keep these in mind before you "fix" something.
 
+- **`U.icon` adds the `i-` prefix.** `U.icon('i-grip')` points at `#i-i-grip` and
+  draws nothing, with no error in the console. That is how the drag grip became an
+  invisible button once. Pass the bare name: `U.icon('grip')`.
 - **One `MediaElementSource` per element, ever.** `player.js` creates the Web Audio
   graph once and connects the single `<audio>` element to an `AnalyserNode` and then
   to the destination. Calling `createMediaElementSource` twice on the same element
@@ -253,7 +260,7 @@ cd "C:\Users\Alir3za\Downloads\Music Player\V3"
 node tools/browser-test.js
 ```
 
-- Expected result: `69/69 checks passed` and `console errors: 0`.
+- Expected result: `72/72 checks passed` and `console errors: 0`.
 - The test starts its own headless Chrome with its own profile under `tools/.tmp/`,
   so it never touches the songs in the real browser profile.
 - It builds its own audio files in memory: a 2 s WAV, a 3 s WAV, and an MP3 with a

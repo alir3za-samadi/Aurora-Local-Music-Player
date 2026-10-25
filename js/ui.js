@@ -23,6 +23,10 @@
   let vizFrame = 0;
   let vizBars = new Array(56).fill(0);
 
+  /* When a queue drag ends, the browser may still send a click to the row.
+     This timestamp lets the click handler ignore that click. */
+  let queueDragEndAt = 0;
+
   /* =========================================================
      Small builders
      ========================================================= */
@@ -140,6 +144,7 @@
 
     /* Keep the sort dropdown in sync with the saved preference. */
     if (els.sort && els.sort.value !== state.sort) els.sort.value = state.sort;
+    if (els.sort && els.sort.closest('.sort')) els.sort.closest('.sort').hidden = false;
 
     state.visible = Library.list(state);
     state.rendered = 0;
@@ -165,11 +170,13 @@
 
     if (state.view === 'queue') {
       els.viewTitle.textContent = 'Playing queue';
-      const total = Player.state.queue.length;
+      const all = Player.state.queue;
+      const list = filteredQueue();
       const parts = [];
-      if (total === 0) parts.push('No songs in the queue');
-      else parts.push(total + (total === 1 ? ' song' : ' songs'));
-      const duration = Player.state.queue.reduce((sum, id) => {
+      if (all.length === 0) parts.push('No songs in the queue');
+      else if (list.length === all.length) parts.push(list.length + (list.length === 1 ? ' song' : ' songs'));
+      else parts.push(list.length + ' of ' + all.length + ' songs');
+      const duration = list.reduce((sum, id) => {
         const t = Library.byId.get(id);
         return sum + (t ? t.duration || 0 : 0);
       }, 0);
@@ -443,21 +450,46 @@
     els.queueList.appendChild(fragment);
   }
 
+  /** The queue ids that match the current search. Empty search returns all. */
+  function filteredQueue() {
+    const all = Player.state.queue;
+    const filter = state.search.trim().toLowerCase();
+    if (!filter) return all;
+    return all.filter((id) => {
+      const track = Library.byId.get(id);
+      return track && track.title.toLowerCase().indexOf(filter) !== -1;
+    });
+  }
+
   function renderQueueView() {
-    const queue = Player.state.queue;
+    const all = Player.state.queue;
+    const queue = filteredQueue();
     const countQueue = U.$('#countQueue');
-    if (countQueue) countQueue.textContent = String(queue.length);
+    if (countQueue) countQueue.textContent = String(all.length);
     els.countAll.textContent = String(Library.count('all'));
     els.countFav.textContent = String(Library.count('favorites'));
+
+    /* Sort has no meaning for a hand-ordered queue, so hide it here. */
+    if (els.sort && els.sort.closest('.sort')) els.sort.closest('.sort').hidden = true;
 
     els.list.textContent = '';
     els.listHead.hidden = true;
     els.list.hidden = queue.length === 0;
     els.empty.hidden = queue.length > 0;
 
-    if (!queue.length) {
+    if (!all.length) {
       els.emptyTitle.textContent = 'The queue is empty';
       els.emptyText.textContent = 'Play a song to fill it.';
+      els.emptyActions.hidden = true;
+      els.emptyNote.hidden = true;
+      updateNav();
+      updateHeader();
+      return;
+    }
+
+    if (!queue.length) {
+      els.emptyTitle.textContent = 'No songs match';
+      els.emptyText.textContent = 'Try another search.';
       els.emptyActions.hidden = true;
       els.emptyNote.hidden = true;
       updateNav();
@@ -470,9 +502,13 @@
     els.emptyActions.hidden = true;
     els.emptyNote.hidden = true;
 
+    /* While a search is active the rows on screen are a subset, so the grip
+       is hidden. Dropping a gap in a filtered order would lose songs. */
+    const draggable = !state.search.trim();
+
     const fragment = document.createDocumentFragment();
     queue.forEach((id) => {
-      const row = queueRowFor(id);
+      const row = queueRowFor(id, draggable);
       if (row) fragment.appendChild(row);
     });
     els.list.appendChild(fragment);
@@ -487,7 +523,7 @@
   }
 
   /** Build one queue row. Used by the drawer and by the Playing queue view. */
-  function queueRowFor(id) {
+  function queueRowFor(id, withGrip) {
     const track = Library.byId.get(id);
     if (!track) return null;
     const isCurrent = id === Player.state.currentId;
@@ -498,22 +534,27 @@
       tabindex: '0',
       'aria-label': 'Play ' + track.title,
     });
-    const handle = U.el('button', { class: 'q-drag', 'aria-label': 'Reorder in queue', title: 'Drag to reorder', dataset: { drag: 'true' } }, [U.icon('i-grip')]);
-    handle.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-      event.preventDefault();
-      const list = row.parentElement;
-      if (!list) return;
-      const rows = Array.from(list.querySelectorAll('.q-row'));
-      const index = rows.indexOf(row);
-      const target = event.key === 'ArrowUp' ? index - 1 : index + 1;
-      if (target < 0 || target >= rows.length) return;
-      if (event.key === 'ArrowUp') list.insertBefore(row, rows[target]);
-      else list.insertBefore(rows[target], row);
-      applyQueueOrder(list);
-      handle.focus();
-    });
-    row.appendChild(handle);
+    if (withGrip === false) {
+      /* Keep the cover in the same place when the grip is hidden. */
+      row.appendChild(U.el('span', { class: 'q-gap', 'aria-hidden': 'true' }));
+    } else {
+      const handle = U.el('button', { class: 'q-drag', 'aria-label': 'Reorder in queue', title: 'Drag to reorder', dataset: { drag: 'true' } }, [U.icon('grip')]);
+      handle.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+        event.preventDefault();
+        const list = row.parentElement;
+        if (!list) return;
+        const rows = Array.from(list.querySelectorAll('.q-row'));
+        const index = rows.indexOf(row);
+        const target = event.key === 'ArrowUp' ? index - 1 : index + 1;
+        if (target < 0 || target >= rows.length) return;
+        if (event.key === 'ArrowUp') list.insertBefore(row, rows[target]);
+        else list.insertBefore(rows[target], row);
+        applyQueueOrder(list);
+        handle.focus();
+      });
+      row.appendChild(handle);
+    }
     row.appendChild(thumbNode(track, 'q-thumb'));
     row.appendChild(U.el('div', { class: 'q-text' }, [U.el('div', { class: 'q-title', text: track.title })]));
     row.appendChild(U.el('span', { class: 'q-time', text: U.fmtTime(track.duration) }));
@@ -530,14 +571,18 @@
   function startQueueDrag(event) {
     const handle = event.target && event.target.closest && event.target.closest('[data-drag]');
     if (!handle) return;
+    if (event.button !== undefined && event.button !== 0) return;
     const row = handle.closest('.q-row');
     if (!row) return;
     const list = row.parentElement;
     if (!list) return;
 
     const initialOrder = Array.from(list.querySelectorAll('.q-row')).map((r) => r.dataset.qid).join('|');
+    let moved = false;
 
     event.preventDefault();
+    /* Capture keeps the move events on the handle. The document listeners
+       below also work when capture is not available (touch, old browsers). */
     try { handle.setPointerCapture(event.pointerId); } catch (e) { /* ignore */ }
     row.classList.add('is-dragging');
 
@@ -548,19 +593,25 @@
         return pointerEvent.clientY < box.top + box.height / 2;
       });
       if (target) list.insertBefore(row, target);
-      else list.appendChild(row);
+      else list.insertBefore(row, list.querySelector('.queue-view-foot') || null);
+      moved = true;
     };
+
     const end = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', end);
-      handle.removeEventListener('pointercancel', end);
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', end);
       row.classList.remove('is-dragging');
       const newOrder = Array.from(list.querySelectorAll('.q-row')).map((r) => r.dataset.qid).join('|');
-      if (newOrder !== initialOrder) applyQueueOrder(list);
+      if (moved && newOrder !== initialOrder) {
+        queueDragEndAt = Date.now();
+        applyQueueOrder(list);
+      }
     };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', end);
-    handle.addEventListener('pointercancel', end);
+
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
   }
 
   /* =========================================================
@@ -1161,6 +1212,12 @@
        with data-act, rows use data-row-action. */
     document.addEventListener('click', (event) => {
       const target = event.target;
+
+      /* A finished queue drag must not also play the row. */
+      if (Date.now() - queueDragEndAt < 350) return;
+
+      /* The grip only drags. A plain click on it does nothing. */
+      if (target.closest && target.closest('[data-drag]')) return;
 
       const closer = target.closest && target.closest('[data-close]');
       if (closer) {

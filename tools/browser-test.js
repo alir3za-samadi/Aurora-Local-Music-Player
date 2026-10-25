@@ -564,6 +564,34 @@ async function main() {
   );
   await sleep(300);
 
+  /* A liked song keeps its filled heart visible even when the mouse is away.
+     The remove button stays hidden until the row is hovered. */
+  const favVis = await evaluate(`(async () => {
+    const rows = Array.from(document.querySelectorAll('#list .row'));
+    const row = rows.find((r) => !r.classList.contains('is-current'));
+    if (!row) return { ok: false };
+    row.querySelector('[data-row-action="fav"]').click();
+    await new Promise((r) => setTimeout(r, 400));
+    const live = document.querySelector('#list .row[data-id="' + row.dataset.id + '"]') || row;
+    const fav = live.querySelector('[data-row-action="fav"]');
+    const trash = live.querySelector('[data-row-action="remove"]');
+    const out = {
+      ok: true,
+      heart: getComputedStyle(fav).opacity,
+      trash: getComputedStyle(trash).opacity,
+      on: fav.classList.contains('is-on')
+    };
+    /* Put the song back so later checks see the same data. */
+    fav.click();
+    await new Promise((r) => setTimeout(r, 300));
+    return out;
+  })()`);
+  check(
+    'a liked row keeps its heart visible without hover',
+    favVis.ok && favVis.heart === '1' && favVis.trash === '0' && favVis.on,
+    JSON.stringify(favVis)
+  );
+
   await evaluate(`(() => {
     const row = document.querySelectorAll('.row')[0];
     const box = row.getBoundingClientRect();
@@ -685,6 +713,58 @@ async function main() {
 
   await evaluate(`document.querySelector('#queue [data-close="queue"]').click()`);
   await sleep(300);
+
+  /* The Playing queue tab must look like All songs: same row height,
+     same cover size, and the drag grip must be a real icon. */
+  const queueView = await evaluate(`(async () => {
+    document.querySelector('[data-view="queue"]').click();
+    await new Promise((r) => setTimeout(r, 400));
+    const row = document.querySelector('#list .q-row');
+    const grip = row && row.querySelector('.q-drag use');
+    const info = {
+      title: document.getElementById('viewTitle').textContent,
+      rows: document.querySelectorAll('#list .q-row').length,
+      height: row ? Math.round(row.getBoundingClientRect().height) : 0,
+      thumb: row ? Math.round(row.querySelector('.q-thumb').getBoundingClientRect().width) : 0,
+      grip: grip ? grip.getAttribute('href') : null,
+      headHidden: document.querySelector('.list-head').hidden,
+      sortHidden: document.querySelector('.sort').hidden
+    };
+    const input = document.getElementById('search');
+    input.value = 'zzz';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 360));
+    info.filtered = document.querySelectorAll('#list .q-row').length;
+    info.filteredEmpty = !document.getElementById('empty').hidden;
+    info.gripWhileFiltered = !!document.querySelector('#list .q-drag');
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 360));
+    info.restored = document.querySelectorAll('#list .q-row').length;
+    document.querySelector('[data-view="all"]').click();
+    await new Promise((r) => setTimeout(r, 350));
+    info.rowHeight = Math.round(document.querySelector('#list .row').getBoundingClientRect().height);
+    return info;
+  })()`);
+  check(
+    'playing queue rows match all songs rows',
+    queueView.title === 'Playing queue' &&
+      queueView.rows === 2 &&
+      queueView.height > 0 &&
+      queueView.height === queueView.rowHeight &&
+      queueView.thumb === 40,
+    JSON.stringify(queueView)
+  );
+  check('queue drag grip uses the real icon', queueView.grip === '#i-grip', queueView.grip);
+  check(
+    'queue view hides sort and filters with search',
+    queueView.sortHidden === true &&
+      queueView.filtered === 0 &&
+      queueView.filteredEmpty === true &&
+      queueView.gripWhileFiltered === false &&
+      queueView.restored === 2,
+    JSON.stringify(queueView)
+  );
 
   await evaluate(`Player.play()`);
   await sleep(700);
