@@ -138,6 +138,9 @@
     const previousTop = preserveScroll ? els.list.scrollTop : 0;
     const previousCount = state.rendered;
 
+    /* Keep the sort dropdown in sync with the saved preference. */
+    if (els.sort && els.sort.value !== state.sort) els.sort.value = state.sort;
+
     state.visible = Library.list(state);
     state.rendered = 0;
     state.limit = preserveScroll ? Math.max(200, previousCount) : 200;

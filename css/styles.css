@@ -799,8 +799,7 @@ select option {
 }
 .row:hover .actions,
 .row:focus-within .actions,
-.row.is-current .actions,
-.row.has-favorite .actions {
+.row.is-current .actions {
   opacity: 1;
 }
 .actions .icon-btn {
@@ -1471,8 +1470,9 @@ input[type='range']::-moz-range-thumb {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 8px;
-  border-radius: 10px;
+  height: var(--row-h);
+  padding: 0 12px;
+  border-radius: var(--radius);
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -1523,6 +1523,10 @@ input[type='range']::-moz-range-thumb {
   width: 14px;
   height: 14px;
 }
+.q-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
   flex: none;
   background-size: cover;
   background-position: center;
