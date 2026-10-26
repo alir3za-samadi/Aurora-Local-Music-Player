@@ -104,14 +104,18 @@
 
 /* ---------- Palettes ----------
    The theme picks dark or light. The palette picks the color family.
-   "default" is the violet look above. "vercel" is plain black, white, gray. */
-[data-palette='vercel'][data-theme='dark'] {
-  --accent: #ffffff;
-  --accent-2: #c9c9c9;
+   "default" is the violet look above and follows the theme. Every other
+   palette is dark only, so it ignores the theme on purpose. */
+
+/* Vercel: black, gray, off-white. There is no white version. */
+[data-palette='vercel'] {
+  color-scheme: dark;
+  --accent: #e5e5e5;
+  --accent-2: #bdbdbd;
   --accent-alt: #8f8f8f;
-  --accent-ink: #000000;
-  --accent-soft: rgba(255, 255, 255, 0.1);
-  --accent-line: rgba(255, 255, 255, 0.24);
+  --accent-ink: #0a0a0a;
+  --accent-soft: rgba(255, 255, 255, 0.09);
+  --accent-line: rgba(255, 255, 255, 0.22);
   --danger: #ff5c5c;
 
   --bg: #000000;
@@ -121,7 +125,7 @@
   --field: rgba(255, 255, 255, 0.06);
   --line: rgba(255, 255, 255, 0.1);
   --line-strong: rgba(255, 255, 255, 0.22);
-  --text: #ededed;
+  --text: #e5e5e5;
   --muted: #a1a1a1;
   --muted-2: #6b6b6b;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
@@ -137,35 +141,97 @@
   --grad-l2: 12%;
 }
 
-[data-palette='vercel'][data-theme='light'] {
-  --accent: #000000;
-  --accent-2: #3d3d3d;
-  --accent-alt: #5c5c5c;
-  --accent-ink: #ffffff;
-  --accent-soft: rgba(0, 0, 0, 0.06);
-  --accent-line: rgba(0, 0, 0, 0.2);
-  --danger: #d92d20;
+/* Amber: warm orange on graphite. */
+[data-palette='amber'] {
+  color-scheme: dark;
+  --accent: #f59e0b;
+  --accent-2: #fb923c;
+  --accent-alt: #d97706;
+  --accent-ink: #1c1206;
+  --accent-soft: rgba(245, 158, 11, 0.16);
+  --accent-line: rgba(245, 158, 11, 0.42);
+  --danger: #fb7185;
 
-  --bg: #ffffff;
-  --bg-2: #ffffff;
-  --panel: #ffffff;
-  --panel-2: #fafafa;
-  --field: rgba(0, 0, 0, 0.04);
-  --line: rgba(0, 0, 0, 0.09);
-  --line-strong: rgba(0, 0, 0, 0.22);
-  --text: #000000;
-  --muted: #666666;
-  --muted-2: #999999;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
-  --hover: rgba(0, 0, 0, 0.04);
-  --scrim: rgba(0, 0, 0, 0.35);
-  --glow-1: transparent;
-  --glow-2: transparent;
+  --bg: #0e0d0b;
+  --bg-2: #14120f;
+  --panel: #171511;
+  --panel-2: #1e1b16;
+  --field: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #f6f3ee;
+  --muted: #b0a89c;
+  --muted-2: #776f63;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --hover: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(8, 6, 2, 0.65);
+  --glow-1: rgba(245, 158, 11, 0.16);
+  --glow-2: rgba(251, 146, 60, 0.1);
 
-  --grad-s1: 0%;
-  --grad-s2: 0%;
-  --grad-l1: 92%;
-  --grad-l2: 80%;
+  --grad-l1: 44%;
+  --grad-l2: 28%;
+}
+
+/* One Dark Pro: the Atom One Dark colors. */
+[data-palette='one-dark'] {
+  color-scheme: dark;
+  --accent: #61afef;
+  --accent-2: #c678dd;
+  --accent-alt: #528bcc;
+  --accent-ink: #0b1018;
+  --accent-soft: rgba(97, 175, 239, 0.16);
+  --accent-line: rgba(97, 175, 239, 0.4);
+  --danger: #e06c75;
+
+  --bg: #21252b;
+  --bg-2: #282c34;
+  --panel: #2c313a;
+  --panel-2: #333842;
+  --field: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #d7dae0;
+  --muted: #9aa0ab;
+  --muted-2: #6b717c;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --hover: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(20, 22, 28, 0.7);
+  --glow-1: rgba(97, 175, 239, 0.14);
+  --glow-2: rgba(198, 120, 221, 0.12);
+
+  --grad-l1: 46%;
+  --grad-l2: 32%;
+}
+
+/* Night Owl: deep navy with blue and violet. */
+[data-palette='night-owl'] {
+  color-scheme: dark;
+  --accent: #82aaff;
+  --accent-2: #c792ea;
+  --accent-alt: #5f7e97;
+  --accent-ink: #03111c;
+  --accent-soft: rgba(130, 170, 255, 0.16);
+  --accent-line: rgba(130, 170, 255, 0.4);
+  --danger: #ef5350;
+
+  --bg: #011627;
+  --bg-2: #01111d;
+  --panel: #0a2137;
+  --panel-2: #0d2942;
+  --field: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #d6deeb;
+  --muted: #8badc1;
+  --muted-2: #5f7e97;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --hover: rgba(255, 255, 255, 0.05);
+  --scrim: rgba(1, 10, 18, 0.7);
+  --glow-1: rgba(130, 170, 255, 0.14);
+  --glow-2: rgba(199, 146, 234, 0.1);
+
+  --grad-l1: 42%;
+  --grad-l2: 28%;
 }
 
 /* ---------- Reset ---------- */
@@ -177,6 +243,15 @@
 
 [hidden] {
   display: none !important;
+}
+
+/* One frame with no motion. `ui.js` adds this class before it changes the
+   theme or the palette, and removes it two frames later. */
+html.no-motion *,
+html.no-motion *::before,
+html.no-motion *::after {
+  transition: none !important;
+  animation: none !important;
 }
 
 html,
@@ -323,23 +398,18 @@ select option {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: linear-gradient(135deg, #7c4dd9, #18a9c5);
-  box-shadow: 0 8px 22px rgba(124, 77, 217, 0.35);
+  color: var(--accent-ink);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 22px var(--accent-soft);
 }
 .brand-mark .icon {
   width: 21px;
   height: 21px;
 }
-/* In the neutral palette the logo is black or white, not violet. */
-[data-palette='vercel'][data-theme='dark'] .brand-mark {
-  background: #ffffff;
-  color: #000000;
-  box-shadow: none;
-}
-[data-palette='vercel'][data-theme='light'] .brand-mark {
-  background: #000000;
-  color: #ffffff;
+/* The Vercel mark is dark gray, never a white tile. */
+[data-palette='vercel'] .brand-mark {
+  background: #242424;
+  color: #cfcfcf;
   box-shadow: none;
 }
 
@@ -446,7 +516,7 @@ select option {
 .btn-primary {
   color: var(--accent-ink);
   background: linear-gradient(135deg, var(--accent), var(--accent-alt));
-  box-shadow: 0 10px 24px rgba(109, 92, 247, 0.28);
+  box-shadow: 0 10px 24px var(--accent-soft);
 }
 .btn-primary:hover {
   filter: brightness(1.07);
@@ -499,6 +569,9 @@ select option {
   gap: 6px;
   padding-top: 2px;
 }
+.sidebar-foot .icon-btn {
+  flex: none;
+}
 .sidebar-foot .danger {
   margin-left: auto;
 }
@@ -511,8 +584,10 @@ select option {
   position: relative;
   display: flex;
   align-items: center;
+  flex: none;
+  width: 92px;
   height: 34px;
-  padding: 0 24px 0 9px;
+  padding: 0 22px 0 9px;
   border-radius: 10px;
   background: var(--field);
   border: 1px solid var(--line);
@@ -524,11 +599,12 @@ select option {
   border: 0;
   background: none;
   outline: none;
+  width: 100%;
   font-size: 12px;
   font-weight: 550;
   color: var(--text);
   cursor: pointer;
-  max-width: 96px;
+  max-width: none;
 }
 .palette::after {
   content: '';
@@ -558,6 +634,15 @@ select option {
 .icon-btn:hover {
   background: var(--hover);
   color: var(--text);
+}
+/* A dark-only palette turns the theme button off. */
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.icon-btn:disabled:hover {
+  background: none;
+  color: var(--muted);
 }
 .icon-btn.is-on {
   color: var(--accent);
@@ -980,9 +1065,9 @@ select option {
   display: grid;
   place-items: center;
   margin-bottom: 8px;
-  color: #fff;
+  color: var(--accent-ink);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 20px 50px rgba(139, 92, 246, 0.32);
+  box-shadow: 0 20px 50px var(--accent-soft);
   position: relative;
 }
 .empty-art::after {
@@ -1153,18 +1238,26 @@ select option {
 [data-theme='light'] .play-btn {
   color: var(--accent-ink);
   background: linear-gradient(135deg, var(--accent), var(--accent-alt));
-  box-shadow: 0 10px 24px rgba(109, 92, 247, 0.32);
+  box-shadow: 0 10px 24px var(--accent-soft);
 }
-/* Vercel keeps controls flat: white on black, black on white. */
+/* Vercel keeps controls flat and gray, with no pure white. */
 [data-palette='vercel'][data-theme='dark'] .play-btn {
-  color: #000000;
-  background: #ffffff;
+  color: #0a0a0a;
+  background: #e5e5e5;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
 }
 [data-palette='vercel'][data-theme='light'] .play-btn {
-  color: #ffffff;
-  background: #000000;
+  color: #0a0a0a;
+  background: #e5e5e5;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+/* The other palettes paint the play button with their own accent. */
+[data-palette='amber'] .play-btn,
+[data-palette='one-dark'] .play-btn,
+[data-palette='night-owl'] .play-btn {
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: 0 8px 22px var(--accent-soft);
 }
 .play-btn:hover {
   box-shadow: 0 0 0 5px var(--accent-soft);
@@ -1903,6 +1996,19 @@ kbd {
   display: none;
 }
 [data-theme='light'] .icon-sun {
+  display: none;
+}
+/* A dark-only palette keeps the app dark, so the sun is the honest icon. */
+[data-palette='vercel'] .icon-sun,
+[data-palette='amber'] .icon-sun,
+[data-palette='one-dark'] .icon-sun,
+[data-palette='night-owl'] .icon-sun {
+  display: block;
+}
+[data-palette='vercel'] .icon-moon,
+[data-palette='amber'] .icon-moon,
+[data-palette='one-dark'] .icon-moon,
+[data-palette='night-owl'] .icon-moon {
   display: none;
 }
 

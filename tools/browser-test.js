@@ -916,16 +916,68 @@ async function main() {
   })()`);
   check(
     'palette select switches to vercel and back',
-    paletteInfo.options === 2 &&
+    paletteInfo.options === 5 &&
       paletteInfo.before.attr === 'default' &&
       paletteInfo.after.attr === 'vercel' &&
       paletteInfo.after.saved === 'vercel' &&
       paletteInfo.after.theme === 'dark' &&
-      paletteInfo.after.accent === '#ffffff' &&
+      paletteInfo.after.accent === '#e5e5e5' &&
       paletteInfo.after.bg === 'rgb(0, 0, 0)' &&
       paletteInfo.before.bg !== paletteInfo.after.bg &&
       paletteInfo.back === 'default',
     JSON.stringify(paletteInfo)
+  );
+
+  /* The VSCode-style palettes are dark only, so the theme button goes off. */
+  const darkOnly = await evaluate(`(async () => {
+    const select = document.getElementById('palette');
+    select.value = 'one-dark';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 140));
+    const before = {
+      theme: document.documentElement.dataset.theme,
+      disabled: document.getElementById('btnTheme').disabled
+    };
+    document.getElementById('btnTheme').click();
+    await new Promise((r) => setTimeout(r, 140));
+    const after = {
+      theme: document.documentElement.dataset.theme,
+      scheme: getComputedStyle(document.documentElement).colorScheme,
+      bg: getComputedStyle(document.body).backgroundColor,
+      accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+    };
+    select.value = 'default';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 140));
+    return { before: before, after: after, enabled: !document.getElementById('btnTheme').disabled };
+  })()`);
+  check(
+    'dark-only palettes ignore the theme',
+    darkOnly.before.theme === 'dark' &&
+      darkOnly.before.disabled === true &&
+      darkOnly.after.theme === 'dark' &&
+      darkOnly.after.scheme === 'dark' &&
+      darkOnly.after.bg === 'rgb(33, 37, 43)' &&
+      darkOnly.after.accent === '#61afef' &&
+      darkOnly.enabled === true,
+    JSON.stringify(darkOnly)
+  );
+
+  /* A theme switch must not animate any color. */
+  const motionGuard = await evaluate(`(async () => {
+    const root = document.documentElement;
+    document.getElementById('btnTheme').click();
+    const during = root.classList.contains('no-motion');
+    await new Promise((r) => setTimeout(r, 160));
+    const after = root.classList.contains('no-motion');
+    document.getElementById('btnTheme').click();
+    await new Promise((r) => setTimeout(r, 160));
+    return { during: during, after: after, theme: root.dataset.theme };
+  })()`);
+  check(
+    'theme switch turns motion off for one frame',
+    motionGuard.during === true && motionGuard.after === false && motionGuard.theme === 'dark',
+    JSON.stringify(motionGuard)
   );
 
   /* ---------- 9. keyboard shortcuts ---------- */

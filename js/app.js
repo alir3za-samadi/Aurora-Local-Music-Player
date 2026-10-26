@@ -22,7 +22,10 @@
     root.dataset.theme = saved || (prefersLight ? 'light' : 'dark');
 
     const savedPalette = U.store.get('palette', 'default');
-    root.dataset.palette = savedPalette === 'vercel' ? 'vercel' : 'default';
+    const select = document.getElementById('palette');
+    const known =
+      select && Array.from(select.options).some((option) => option.value === savedPalette);
+    root.dataset.palette = known ? savedPalette : 'default';
   }
 
   async function loadLibrary() {

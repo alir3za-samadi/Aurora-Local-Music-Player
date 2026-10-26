@@ -97,7 +97,7 @@ Key prefix `aurora.v3.` (defined once in `util.js` as `U.store`). Access it thro
 | `aurora.v3.view` | `'all'` or `'favorites'` |
 | `aurora.v3.sort` | one of the 6 sort keys in `library.js` |
 | `aurora.v3.theme` | `'dark'` or `'light'` |
-| `aurora.v3.palette` | `'default'` or `'vercel'` |
+| `aurora.v3.palette` | `'default'`, `'vercel'`, `'amber'`, `'one-dark'`, or `'night-owl'` |
 
 `aurora.v3.state` holds:
 
@@ -129,6 +129,40 @@ tab becomes hidden, so a close does not lose the position. Do not add a save on 
 `app.js` sets `document.documentElement.dataset.theme` and `dataset.palette`
 **before** anything renders, so the first paint has the right colors and does not
 flash. If you add a setting that changes colors, restore it in the same early step.
+
+Both values are checked against the real controls before they are used. The theme
+must be `'dark'` or `'light'`, and the palette must match one `<option>` in
+`#palette`. A value from an older version falls back to the default instead of
+breaking the page.
+
+### Palettes are a second axis
+
+`Default` follows the theme. The other four (`vercel`, `amber`, `one-dark`,
+`night-owl`) are **dark only**: they set `color-scheme: dark` and their token block
+has no `[data-theme]` guard, so it wins in the light theme too. `ui.js` keeps the
+same list in `DARK_ONLY`. While one of them is selected:
+
+- `setTheme` returns early, so the theme button does nothing.
+- `updateThemeLabel` sets `btnTheme.disabled` and the title "This palette is dark
+  only", so the button never looks broken.
+- The sun icon is forced visible, because the app is dark whatever the saved theme.
+
+When you add a palette, add its `<option>`, its token block, its `META_COLORS`
+entry, and its name in `DARK_ONLY`.
+
+### No animation on a theme switch
+
+Changing the theme or the palette must not fade. `ui.js` has `instantly(run)`:
+
+```text
+add .no-motion on <html>  ->  change data-theme / data-palette  ->  run()
+-> rAF -> rAF -> remove .no-motion
+```
+
+`.no-motion` sets `transition: none !important` and `animation: none !important`
+on every element. The change and the guard land in the same style pass, so no
+transition starts. The first frame paints with motion off; the second frame turns
+it back on, so a later hover still animates.
 
 ---
 
@@ -187,11 +221,24 @@ The queue is also written to localStorage, so a reload continues in the same ord
 - **Styling uses CSS variables** from `:root` in `styles.css`. The theme flips them
   through `[data-theme="light"]`; the palette adds a second layer through
   `[data-palette="vercel"]`. Never hard-code a color in the JS.
-- **The palette has three tokens that keep it neutral.** `--accent` is the main color,
-  `--accent-alt` is the second stop of a gradient, and `--accent-ink` is the text on
-  top of an accent button. A palette that sets `--accent` to white must also set
-  `--accent-ink` to black. The Vercel blocks also turn the glows transparent and set
+- **The palette has three tokens that keep it readable.** `--accent` is the main
+  color, `--accent-alt` is the second stop of a gradient, and `--accent-ink` is the
+  text on top of an accent button. A palette with a light accent must set
+  `--accent-ink` to a dark color. Vercel also turns the glows transparent and sets
   `--grad-s1` / `--grad-s2` to `0%`, so covers come out gray.
+- **A palette block must come after the theme blocks.** `[data-palette="x"]` and
+  `[data-theme="light"]` have the same specificity, so source order decides. Moving
+  a palette above the theme blocks makes the light theme win again.
+- **`Default` is the only palette with a light version.** Vercel is black and gray
+  with no pure white: `--accent` is `#e5e5e5`, the play button is gray, and the logo
+  tile is `#242424` with a gray note. Do not put `#fff` back in that block.
+- **`--accent` paints more than links.** `.brand-mark`, `.btn-primary`, `.empty-art`,
+  and the play button use it, so a new palette changes them with no extra rule. The
+  play button follows `--accent` for Amber, One Dark, and Night Owl, and stays gray
+  for Vercel.
+- **The favicon is an inline data URI with a transparent background.** It is a white
+  note with a faint dark underlay, so it shows on a light tab and on a dark tab.
+  There is no `<rect>` and no icon file in `assets/`.
 - **The cover placeholder is a plain gradient.** `thumbNode` and `placeholder` only set
   `--hue`; the two colors come from the `--grad-*` tokens. Never put text, initials, or
   an icon inside a cover.
@@ -271,7 +318,12 @@ Keep these in mind before you "fix" something.
 - **Native dropdowns need `color-scheme`.** The sort `<select>` popup is drawn by the
   operating system, not by CSS. Without `color-scheme: dark` on `[data-theme='dark']`,
   the popup is white with light text. The token lives in the theme blocks, so a new
-  theme must set it too.
+  theme must set it too. Every dark-only palette sets its own, so the popup stays dark
+  even when the saved theme is light.
+- **The theme button is disabled by `disabled`, not by a click guard.** A disabled
+  button fires no click and leaves the tab order, which is the honest signal for a
+  dark-only palette. The `T` shortcut still reaches `toggleTheme`, so `setTheme` keeps
+  its early return.
 - **The cover gradient needs both lightness tokens.** `[data-theme='dark']` overrides
   `--grad-l1` / `--grad-l2` to darker values, and `[data-theme='light']` to lighter
   ones. The base `:root` values are the fallback only.
@@ -302,7 +354,7 @@ cd "C:\Users\Alir3za\Downloads\Music Player\V3"
 node tools/browser-test.js
 ```
 
-- Expected result: `79/79 checks passed` and `console errors: 0`.
+- Expected result: `81/81 checks passed` and `console errors: 0`.
 - The test starts its own headless Chrome with its own profile under `tools/.tmp/`,
   so it never touches the songs in the real browser profile.
 - It builds its own audio files in memory: a 2 s WAV, a 3 s WAV, and an MP3 with a
@@ -310,10 +362,12 @@ node tools/browser-test.js
   shipping test files.
 - It also checks that the library survives a reload, that the position is restored,
   that the visualizer paints pixels, that the mobile drawer opens, that `color-scheme`
-  follows the theme, that the palette select applies and saves Vercel, that the song
-  menu moves a song with "Play next", that a drag moves the row and shifts its
-  neighbours, that a like touches only one row, that the volume label sits on the
-  thumb, and that a cover placeholder is a gradient with nothing drawn on top.
+  follows the theme, that the palette select has five options, applies Vercel, and
+  saves it, that a dark-only palette ignores the theme and turns the theme button off,
+  that a theme switch adds `.no-motion` for one frame, that the song menu moves a song
+  with "Play next", that a drag moves the row and shifts its neighbours, that a like
+  touches only one row, that the volume label sits on the thumb, and that a cover
+  placeholder is a gradient with nothing drawn on top.
 - Queue checks: the drawer rows and the Playing queue rows are 60 px and have the
   same cells as the list, the drawer shuffle button is 32 px tall with a small gap
   under it, and a queue row carries a heart.
@@ -332,11 +386,14 @@ the other checks. Keep the console-error counter at zero.
 2. Play one, seek, then reload the page. The song and the position must come back,
    paused.
 3. Switch to light theme, pick the Vercel palette, pick a different sort, favorite a
-   song, reload. All four must survive.
-4. Press `?` and walk the shortcut list.
-5. Right-click a song in the list and in the queue drawer. Both menus must open, and
+   song, reload. All four must survive. With Vercel selected the app must stay dark
+   and the theme button must be off.
+4. Pick Amber, One Dark, and Night Owl. Each one must paint the whole page, and the
+   theme button must stay off. Press `T`: nothing may change.
+5. Press `?` and walk the shortcut list.
+6. Right-click a song in the list and in the queue drawer. Both menus must open, and
    "Play next" must move the song.
-6. Resize to phone width and open the menu.
+7. Resize to phone width and open the menu.
 
 ---
 

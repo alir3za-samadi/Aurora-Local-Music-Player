@@ -1227,29 +1227,65 @@
   /* =========================================================
      Theme + prefs
      ========================================================= */
+
+  /* Every palette except the default one is dark only. The theme button is
+     turned off while one of them is active, so it never looks broken. */
+  const DARK_ONLY = ['vercel', 'amber', 'one-dark', 'night-owl'];
+
   const META_COLORS = {
-    'default-dark': '#08080d',
-    'default-light': '#f2f3f9',
-    'vercel-dark': '#000000',
-    'vercel-light': '#ffffff',
+    default: { dark: '#08080d', light: '#f2f3f9' },
+    vercel: { dark: '#000000' },
+    amber: { dark: '#0e0d0b' },
+    'one-dark': { dark: '#21252b' },
+    'night-owl': { dark: '#011627' },
   };
+
+  function isDarkOnly() {
+    return DARK_ONLY.indexOf(document.documentElement.dataset.palette || 'default') !== -1;
+  }
 
   function applyMetaColor() {
     const meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) return;
     const root = document.documentElement;
-    const key = (root.dataset.palette || 'default') + '-' + (root.dataset.theme || 'dark');
-    meta.setAttribute('content', META_COLORS[key] || META_COLORS['default-dark']);
+    const palette = root.dataset.palette || 'default';
+    const theme = root.dataset.theme || 'dark';
+    const colors = META_COLORS[palette] || META_COLORS.default;
+    meta.setAttribute('content', colors[theme] || colors.dark || META_COLORS.default.dark);
+  }
+
+  /** Change the document without any CSS transition running. */
+  function instantly(run) {
+    const root = document.documentElement;
+    root.classList.add('no-motion');
+    run();
+    /* The first frame paints with motion off. The second one turns it back
+       on, so a later hover still animates. */
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => root.classList.remove('no-motion'));
+    });
   }
 
   function updateThemeLabel() {
     if (!els.btnTheme) return;
-    const light = document.documentElement.dataset.theme === 'light';
-    els.btnTheme.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
+    const darkOnly = isDarkOnly();
+    els.btnTheme.disabled = darkOnly;
+    els.btnTheme.title = darkOnly ? 'This palette is dark only' : 'Switch theme (T)';
+    els.btnTheme.setAttribute(
+      'aria-label',
+      darkOnly
+        ? 'The selected palette is dark only'
+        : document.documentElement.dataset.theme === 'light'
+          ? 'Switch to dark theme'
+          : 'Switch to light theme'
+    );
   }
 
   function setTheme(theme) {
-    document.documentElement.dataset.theme = theme;
+    if (isDarkOnly()) return;
+    instantly(() => {
+      document.documentElement.dataset.theme = theme;
+    });
     U.store.set('theme', theme);
     applyMetaColor();
     updateThemeLabel();
@@ -1259,13 +1295,17 @@
     setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
   }
 
-  /** Palette is a second axis: dark or light stays, the colors change. */
+  /** Palette is a second axis: the color family, apart from the theme. */
   function setPalette(palette) {
-    const value = palette === 'vercel' ? 'vercel' : 'default';
-    document.documentElement.dataset.palette = value;
+    const known = els.palette && els.palette.querySelector('option[value="' + palette + '"]');
+    const value = known ? palette : 'default';
+    instantly(() => {
+      document.documentElement.dataset.palette = value;
+    });
     U.store.set('palette', value);
     if (els.palette) els.palette.value = value;
     applyMetaColor();
+    updateThemeLabel();
   }
 
   function setView(view) {
@@ -1809,6 +1849,7 @@
       : 'default';
     els.palette.value = paletteValue;
     document.documentElement.dataset.palette = paletteValue;
+    updateThemeLabel();
 
     els.scrim.hidden = false;
     els.scrimSidebar.hidden = false;
