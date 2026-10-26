@@ -464,6 +464,9 @@
    */
   function playNext(id) {
     if (!byId.has(id)) return false;
+    /* The song that is playing is already "next". Pulling it out of the queue
+       and pushing it back put it at the end, so the player lost its place. */
+    if (id === state.currentId) return 'current';
 
     const queue = state.queue.filter((item) => item !== id);
     const currentIndex = queue.indexOf(state.currentId);

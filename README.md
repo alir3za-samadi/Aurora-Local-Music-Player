@@ -47,10 +47,11 @@ original files on disk are never changed, moved, or deleted.
   The song name also shows in the system media panel.
 - 🌗 **Themes** — dark and light. The app follows your system theme on the first run.
   A theme switch is instant and has no animation.
-- 🎨 **Palettes** — next to the theme button. `Default` is the violet look and follows
-  the theme. `Vercel` is black and gray, with no white version. `Amber` is warm orange.
-  `One Dark` and `Night Owl` copy the well-known editor themes. Those four are dark
-  only, so the theme button turns off while one of them is selected.
+- 🎨 **Palettes** — next to the theme button. `Default` is the violet look.
+  `Vercel` is black and gray. `Amber`, `One Dark`, `Night Flat`, `Night Owl`,
+  `Monokai`, `Dracula`, `Nord`, and `Gruvbox` copy known editor themes. Every
+  palette has a dark and a light version, except `Vercel`. Each one uses a single
+  color, so the covers match it. `Default` is the only multi-color palette.
 - 🧹 **Remove and clear** — remove one song from its row, or clear the whole library
   from the sidebar. Both ask for confirmation first. The row buttons are always
   visible, with no hover step.
@@ -156,7 +157,7 @@ list above. Firefox does not play some AAC or M4A files.
 | `Q` | Open the queue |
 | Right-click | Open the song menu (play next, favorite, remove) |
 | `/` | Focus the search box |
-| `T` | Switch theme (`Default` palette only) |
+| `T` | Switch theme (off in the Vercel palette) |
 | `?` | Show this list inside the app |
 | `Esc` | Close the panel or the dialog |
 

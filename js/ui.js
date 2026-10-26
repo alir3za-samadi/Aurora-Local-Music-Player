@@ -987,7 +987,10 @@
     menu.textContent = '';
 
     menu.appendChild(contextItem('Play next', () => {
-      Player.playNext(id);
+      if (Player.playNext(id) === 'current') {
+        toast('“' + track.title + '” is already playing');
+        return;
+      }
       toast('“' + track.title + '” will play next');
     }));
     menu.appendChild(
@@ -1228,16 +1231,21 @@
      Theme + prefs
      ========================================================= */
 
-  /* Every palette except the default one is dark only. The theme button is
-     turned off while one of them is active, so it never looks broken. */
-  const DARK_ONLY = ['vercel', 'amber', 'one-dark', 'night-owl'];
+  /* Vercel is the only palette with no light version. The theme button is
+     turned off while it is active, so it never looks broken. */
+  const DARK_ONLY = ['vercel'];
 
   const META_COLORS = {
     default: { dark: '#08080d', light: '#f2f3f9' },
     vercel: { dark: '#000000' },
-    amber: { dark: '#0e0d0b' },
-    'one-dark': { dark: '#21252b' },
-    'night-owl': { dark: '#011627' },
+    amber: { dark: '#0e0d0b', light: '#fdfbf7' },
+    'one-dark': { dark: '#21252b', light: '#f7f8fa' },
+    'one-dark-flat': { dark: '#14171c', light: '#eceef2' },
+    'night-owl': { dark: '#011627', light: '#f4f8fb' },
+    monokai: { dark: '#1e1f1c', light: '#faf8f5' },
+    dracula: { dark: '#282a36', light: '#f8f6ff' },
+    nord: { dark: '#2e3440', light: '#f3f6f8' },
+    gruvbox: { dark: '#282828', light: '#fbf1c7' },
   };
 
   function isDarkOnly() {

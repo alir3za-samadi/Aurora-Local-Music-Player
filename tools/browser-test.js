@@ -667,6 +667,33 @@ async function main() {
   check('play next puts the song right after the current one', afterNext.moved, afterNext.order);
   check('menu closes after a choice', afterNext.hidden === true);
 
+  /* The current song is already next. The move used to drop it from the queue. */
+  const currentNext = await evaluate(`(async () => {
+    const id = Player.state.currentId;
+    const row = document.querySelector('#list .row[data-id="' + id + '"]');
+    if (!row) return { missing: true };
+    const box = row.getBoundingClientRect();
+    row.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true,
+      clientX: box.left + 40, clientY: box.top + 12
+    }));
+    await new Promise((r) => setTimeout(r, 140));
+    const before = Player.state.queue.join() + '|' + Player.state.pos;
+    document.querySelectorAll('#ctxMenu > div')[0].click();
+    await new Promise((r) => setTimeout(r, 220));
+    return {
+      same: Player.state.queue.join() + '|' + Player.state.pos === before,
+      current: Player.state.currentId === id,
+      inside: Player.state.queue.indexOf(id) === Player.state.pos,
+      toast: document.getElementById('toasts').textContent
+    };
+  })()`);
+  check(
+    'play next on the current song keeps the queue',
+    currentNext.same === true && currentNext.current === true && currentNext.inside === true,
+    JSON.stringify(currentNext)
+  );
+
   /* ---------- 8. queue + now playing + theme ---------- */
   await evaluate(`document.querySelector('.player [data-act="queue"]').click()`);
   await sleep(350);
@@ -916,7 +943,7 @@ async function main() {
   })()`);
   check(
     'palette select switches to vercel and back',
-    paletteInfo.options === 5 &&
+    paletteInfo.options === 10 &&
       paletteInfo.before.attr === 'default' &&
       paletteInfo.after.attr === 'vercel' &&
       paletteInfo.after.saved === 'vercel' &&
@@ -928,39 +955,68 @@ async function main() {
     JSON.stringify(paletteInfo)
   );
 
-  /* The VSCode-style palettes are dark only, so the theme button goes off. */
-  const darkOnly = await evaluate(`(async () => {
+  /* Every palette but Vercel follows the theme. */
+  const paletteLight = await evaluate(`(async () => {
     const select = document.getElementById('palette');
-    select.value = 'one-dark';
+    const names = ['amber', 'one-dark', 'one-dark-flat', 'night-owl', 'monokai', 'dracula', 'nord', 'gruvbox'];
+    const out = [];
+    for (const name of names) {
+      select.value = name;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      UI.setTheme('light');
+      await new Promise((r) => setTimeout(r, 70));
+      const rgb = (getComputedStyle(document.body).backgroundColor.match(/\\d+/g) || []).map(Number);
+      out.push({
+        name: name,
+        theme: document.documentElement.dataset.theme,
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+        light: rgb[0] > 190 && rgb[1] > 190 && rgb[2] > 180,
+        disabled: document.getElementById('btnTheme').disabled
+      });
+      UI.setTheme('dark');
+      await new Promise((r) => setTimeout(r, 70));
+    }
+    select.value = 'default';
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    await new Promise((r) => setTimeout(r, 140));
-    const before = {
+    return out;
+  })()`);
+  check(
+    'every palette but Vercel follows the theme',
+    paletteLight.every(
+      (p) => p.theme === 'light' && p.scheme === 'light' && p.light === true && p.disabled === false
+    ),
+    JSON.stringify(paletteLight)
+  );
+
+  /* Vercel stays dark even when the saved theme is light. */
+  const vercelDark = await evaluate(`(async () => {
+    UI.setTheme('light');
+    await new Promise((r) => setTimeout(r, 90));
+    const select = document.getElementById('palette');
+    select.value = 'vercel';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 90));
+    const out = {
       theme: document.documentElement.dataset.theme,
-      disabled: document.getElementById('btnTheme').disabled
-    };
-    document.getElementById('btnTheme').click();
-    await new Promise((r) => setTimeout(r, 140));
-    const after = {
-      theme: document.documentElement.dataset.theme,
+      disabled: document.getElementById('btnTheme').disabled,
       scheme: getComputedStyle(document.documentElement).colorScheme,
       bg: getComputedStyle(document.body).backgroundColor,
       accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
     };
     select.value = 'default';
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    await new Promise((r) => setTimeout(r, 140));
-    return { before: before, after: after, enabled: !document.getElementById('btnTheme').disabled };
+    UI.setTheme('dark');
+    await new Promise((r) => setTimeout(r, 90));
+    return out;
   })()`);
   check(
-    'dark-only palettes ignore the theme',
-    darkOnly.before.theme === 'dark' &&
-      darkOnly.before.disabled === true &&
-      darkOnly.after.theme === 'dark' &&
-      darkOnly.after.scheme === 'dark' &&
-      darkOnly.after.bg === 'rgb(33, 37, 43)' &&
-      darkOnly.after.accent === '#61afef' &&
-      darkOnly.enabled === true,
-    JSON.stringify(darkOnly)
+    'vercel ignores the light theme',
+    vercelDark.theme === 'light' &&
+      vercelDark.disabled === true &&
+      vercelDark.scheme === 'dark' &&
+      vercelDark.bg === 'rgb(0, 0, 0)' &&
+      vercelDark.accent === '#e5e5e5',
+    JSON.stringify(vercelDark)
   );
 
   /* A theme switch must not animate any color. */

@@ -97,7 +97,7 @@ Key prefix `aurora.v3.` (defined once in `util.js` as `U.store`). Access it thro
 | `aurora.v3.view` | `'all'` or `'favorites'` |
 | `aurora.v3.sort` | one of the 6 sort keys in `library.js` |
 | `aurora.v3.theme` | `'dark'` or `'light'` |
-| `aurora.v3.palette` | `'default'`, `'vercel'`, `'amber'`, `'one-dark'`, or `'night-owl'` |
+| `aurora.v3.palette` | one of the 10 `<option>` values in `#palette` |
 
 `aurora.v3.state` holds:
 
@@ -137,18 +137,42 @@ breaking the page.
 
 ### Palettes are a second axis
 
-`Default` follows the theme. The other four (`vercel`, `amber`, `one-dark`,
-`night-owl`) are **dark only**: they set `color-scheme: dark` and their token block
-has no `[data-theme]` guard, so it wins in the light theme too. `ui.js` keeps the
-same list in `DARK_ONLY`. While one of them is selected:
+`Default` is the violet look. The other nine palettes each own one color family,
+and all of them except `vercel` have a dark and a light block:
+
+```css
+[data-palette='nord'] { /* dark */ }
+[data-palette='nord'][data-theme='light'] { /* light */ }
+```
+
+The base block must come after the theme blocks. The light block wins over both,
+because two attribute selectors beat one. `Vercel` has no light block on purpose,
+so its token block wins in the light theme too. `ui.js` keeps the list in
+`DARK_ONLY` (`['vercel']`). While Vercel is selected:
 
 - `setTheme` returns early, so the theme button does nothing.
 - `updateThemeLabel` sets `btnTheme.disabled` and the title "This palette is dark
   only", so the button never looks broken.
 - The sun icon is forced visible, because the app is dark whatever the saved theme.
 
-When you add a palette, add its `<option>`, its token block, its `META_COLORS`
-entry, and its name in `DARK_ONLY`.
+When you add a palette, add its `<option>`, its dark and light blocks, its
+`META_COLORS` entry, and, if it has no light version, its name in `DARK_ONLY`.
+
+### One color per palette
+
+`Default` gives each cover its own hue. Every palette is single color, so all
+covers in it share one hue. The gradient uses three tokens:
+
+| Token | Meaning |
+| --- | --- |
+| `--hue-mix` | `1` keeps the song hue, `0` uses the palette hue |
+| `--hue-base` | the palette hue in degrees |
+| `--hue-spread` | second stop offset; `0` means one color |
+
+A palette only sets `--hue-mix: 0`, `--hue-spread: 0`, and its own `--hue-base`.
+Do not put the `calc()` for the cover hue in `:root` as a token: custom properties
+are computed where they are declared, so it would freeze to `260` and ignore the
+inline `--hue` on each thumb.
 
 ### No animation on a theme switch
 
@@ -229,13 +253,15 @@ The queue is also written to localStorage, so a reload continues in the same ord
 - **A palette block must come after the theme blocks.** `[data-palette="x"]` and
   `[data-theme="light"]` have the same specificity, so source order decides. Moving
   a palette above the theme blocks makes the light theme win again.
-- **`Default` is the only palette with a light version.** Vercel is black and gray
-  with no pure white: `--accent` is `#e5e5e5`, the play button is gray, and the logo
-  tile is `#242424` with a gray note. Do not put `#fff` back in that block.
+- **`Vercel` is the only palette with no light version.** It is black and gray with
+  no pure white: `--accent` is `#e5e5e5`, the play button is gray, and the logo tile
+  is `#242424` with a gray note. Do not put `#fff` back in that block.
 - **`--accent` paints more than links.** `.brand-mark`, `.btn-primary`, `.empty-art`,
   and the play button use it, so a new palette changes them with no extra rule. The
-  play button follows `--accent` for Amber, One Dark, and Night Owl, and stays gray
-  for Vercel.
+  play button follows `--accent` in every palette except Vercel, where it stays gray.
+- **Play next on the current song is a no-op, not a move.** `Player.playNext` returns
+  `'current'` before it touches the queue. Filtering the current id out and pushing
+  it back put it at the end and lost `state.pos`. `ui.js` shows a toast instead.
 - **The favicon is an inline data URI with a transparent background.** It is a white
   note with a faint dark underlay, so it shows on a light tab and on a dark tab.
   There is no `<rect>` and no icon file in `assets/`.
@@ -354,7 +380,7 @@ cd "C:\Users\Alir3za\Downloads\Music Player\V3"
 node tools/browser-test.js
 ```
 
-- Expected result: `81/81 checks passed` and `console errors: 0`.
+- Expected result: `83/83 checks passed` and `console errors: 0`.
 - The test starts its own headless Chrome with its own profile under `tools/.tmp/`,
   so it never touches the songs in the real browser profile.
 - It builds its own audio files in memory: a 2 s WAV, a 3 s WAV, and an MP3 with a
@@ -362,12 +388,14 @@ node tools/browser-test.js
   shipping test files.
 - It also checks that the library survives a reload, that the position is restored,
   that the visualizer paints pixels, that the mobile drawer opens, that `color-scheme`
-  follows the theme, that the palette select has five options, applies Vercel, and
-  saves it, that a dark-only palette ignores the theme and turns the theme button off,
-  that a theme switch adds `.no-motion` for one frame, that the song menu moves a song
-  with "Play next", that a drag moves the row and shifts its neighbours, that a like
-  touches only one row, that the volume label sits on the thumb, and that a cover
-  placeholder is a gradient with nothing drawn on top.
+  follows the theme, that the palette select has ten options, applies Vercel, and
+  saves it, that every palette but Vercel turns light with the light theme, that
+  Vercel ignores the theme and turns the theme button off, that a theme switch adds
+  `.no-motion` for one frame, that "Play next" on the current song leaves the queue
+  untouched, that the song menu moves another song with "Play next", that a drag moves
+  the row and shifts its neighbours, that a like touches only one row, that the volume
+  label sits on the thumb, and that a cover placeholder is a gradient with nothing
+  drawn on top.
 - Queue checks: the drawer rows and the Playing queue rows are 60 px and have the
   same cells as the list, the drawer shuffle button is 32 px tall with a small gap
   under it, and a queue row carries a heart.
@@ -388,8 +416,9 @@ the other checks. Keep the console-error counter at zero.
 3. Switch to light theme, pick the Vercel palette, pick a different sort, favorite a
    song, reload. All four must survive. With Vercel selected the app must stay dark
    and the theme button must be off.
-4. Pick Amber, One Dark, and Night Owl. Each one must paint the whole page, and the
-   theme button must stay off. Press `T`: nothing may change.
+4. Pick Amber, One Dark, Night Flat, Night Owl, Monokai, Dracula, Nord, and Gruvbox.
+   Each one must paint the page, and the theme button must work. Covers in a palette
+   must share one color; only Default has different colors.
 5. Press `?` and walk the shortcut list.
 6. Right-click a song in the list and in the queue drawer. Both menus must open, and
    "Play next" must move the song.

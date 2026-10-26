@@ -53,7 +53,11 @@
   --player-h: 92px;
 
   /* Cover placeholder: two stops built from the song's own hue.
-     Only the lightness changes per theme. */
+     Only the lightness changes per theme. A palette sets `--hue-mix` to 0 and
+     `--hue-base` to its own hue, so every cover in that palette is one color. */
+  --hue-mix: 1;
+  --hue-base: 0;
+  --hue-spread: 45;
   --grad-s1: 62%;
   --grad-s2: 66%;
   --grad-l1: 52%;
@@ -105,9 +109,10 @@
 /* ---------- Palettes ----------
    The theme picks dark or light. The palette picks the color family.
    "default" is the violet look above and follows the theme. Every other
-   palette is dark only, so it ignores the theme on purpose. */
+   palette follows the theme too, except Vercel, which has no white version.
+   Each palette is one color: the covers use `--hue-base`, not the song hue. */
 
-/* Vercel: black, gray, off-white. There is no white version. */
+/* Vercel: black, gray, off-white. There is no light version. */
 [data-palette='vercel'] {
   color-scheme: dark;
   --accent: #e5e5e5;
@@ -135,17 +140,19 @@
   --glow-2: transparent;
 
   /* Gray covers: no hue, only lightness. */
+  --hue-mix: 0;
+  --hue-spread: 0;
   --grad-s1: 0%;
   --grad-s2: 0%;
   --grad-l1: 26%;
   --grad-l2: 12%;
 }
 
-/* Amber: warm orange on graphite. */
+/* Amber: one warm orange. */
 [data-palette='amber'] {
   color-scheme: dark;
   --accent: #f59e0b;
-  --accent-2: #fb923c;
+  --accent-2: #fbbf24;
   --accent-alt: #d97706;
   --accent-ink: #1c1206;
   --accent-soft: rgba(245, 158, 11, 0.16);
@@ -166,18 +173,51 @@
   --hover: rgba(255, 255, 255, 0.06);
   --scrim: rgba(8, 6, 2, 0.65);
   --glow-1: rgba(245, 158, 11, 0.16);
-  --glow-2: rgba(251, 146, 60, 0.1);
+  --glow-2: rgba(245, 158, 11, 0.1);
 
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 32;
+  --grad-s1: 62%;
+  --grad-s2: 58%;
   --grad-l1: 44%;
-  --grad-l2: 28%;
+  --grad-l2: 30%;
+}
+[data-palette='amber'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #b45309;
+  --accent-2: #d97706;
+  --accent-alt: #92400e;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(180, 83, 9, 0.12);
+  --accent-line: rgba(180, 83, 9, 0.35);
+  --danger: #dc2626;
+
+  --bg: #fdfbf7;
+  --bg-2: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #faf7f2;
+  --field: rgba(60, 40, 10, 0.05);
+  --line: rgba(60, 40, 10, 0.1);
+  --line-strong: rgba(60, 40, 10, 0.2);
+  --text: #1d1608;
+  --muted: #6b5c45;
+  --muted-2: #9a8b74;
+  --shadow: 0 20px 45px rgba(60, 40, 10, 0.12);
+  --hover: rgba(60, 40, 10, 0.05);
+  --scrim: rgba(30, 20, 5, 0.3);
+  --glow-1: rgba(245, 158, 11, 0.14);
+  --glow-2: rgba(245, 158, 11, 0.1);
+  --grad-l1: 78%;
+  --grad-l2: 66%;
 }
 
-/* One Dark Pro: the Atom One Dark colors. */
+/* One Dark Pro: one blue. */
 [data-palette='one-dark'] {
   color-scheme: dark;
   --accent: #61afef;
-  --accent-2: #c678dd;
-  --accent-alt: #528bcc;
+  --accent-2: #7fc1ff;
+  --accent-alt: #4a90d9;
   --accent-ink: #0b1018;
   --accent-soft: rgba(97, 175, 239, 0.16);
   --accent-line: rgba(97, 175, 239, 0.4);
@@ -197,17 +237,114 @@
   --hover: rgba(255, 255, 255, 0.06);
   --scrim: rgba(20, 22, 28, 0.7);
   --glow-1: rgba(97, 175, 239, 0.14);
-  --glow-2: rgba(198, 120, 221, 0.12);
+  --glow-2: rgba(97, 175, 239, 0.1);
 
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 208;
+  --grad-s1: 48%;
+  --grad-s2: 44%;
   --grad-l1: 46%;
   --grad-l2: 32%;
 }
+[data-palette='one-dark'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #2b7bbf;
+  --accent-2: #1f6aa5;
+  --accent-alt: #2563a8;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(43, 123, 191, 0.12);
+  --accent-line: rgba(43, 123, 191, 0.32);
+  --danger: #d6384a;
 
-/* Night Owl: deep navy with blue and violet. */
+  --bg: #f7f8fa;
+  --bg-2: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #eef0f4;
+  --field: rgba(40, 44, 52, 0.05);
+  --line: rgba(40, 44, 52, 0.1);
+  --line-strong: rgba(40, 44, 52, 0.2);
+  --text: #21252b;
+  --muted: #5c636f;
+  --muted-2: #8a929e;
+  --shadow: 0 20px 45px rgba(40, 44, 52, 0.12);
+  --hover: rgba(40, 44, 52, 0.05);
+  --scrim: rgba(32, 36, 44, 0.3);
+  --glow-1: rgba(97, 175, 239, 0.14);
+  --glow-2: rgba(97, 175, 239, 0.1);
+  --grad-l1: 76%;
+  --grad-l2: 64%;
+}
+
+/* One Dark Night Flat: the same blue, one step darker. */
+[data-palette='one-dark-flat'] {
+  color-scheme: dark;
+  --accent: #61afef;
+  --accent-2: #7fc1ff;
+  --accent-alt: #4a90d9;
+  --accent-ink: #0a0f16;
+  --accent-soft: rgba(97, 175, 239, 0.14);
+  --accent-line: rgba(97, 175, 239, 0.36);
+  --danger: #e06c75;
+
+  --bg: #14171c;
+  --bg-2: #181b21;
+  --panel: #1d2127;
+  --panel-2: #232830;
+  --field: rgba(255, 255, 255, 0.04);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.15);
+  --text: #ccd1d8;
+  --muted: #8f96a3;
+  --muted-2: #626a76;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --hover: rgba(255, 255, 255, 0.05);
+  --scrim: rgba(12, 14, 18, 0.75);
+  --glow-1: rgba(97, 175, 239, 0.1);
+  --glow-2: rgba(97, 175, 239, 0.07);
+
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 208;
+  --grad-s1: 44%;
+  --grad-s2: 40%;
+  --grad-l1: 40%;
+  --grad-l2: 26%;
+}
+[data-palette='one-dark-flat'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #2b7bbf;
+  --accent-2: #1f6aa5;
+  --accent-alt: #2563a8;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(43, 123, 191, 0.12);
+  --accent-line: rgba(43, 123, 191, 0.32);
+  --danger: #d6384a;
+
+  --bg: #eceef2;
+  --bg-2: #f7f8fa;
+  --panel: #f7f8fa;
+  --panel-2: #e9ecf1;
+  --field: rgba(30, 34, 40, 0.05);
+  --line: rgba(30, 34, 40, 0.1);
+  --line-strong: rgba(30, 34, 40, 0.2);
+  --text: #1b1f26;
+  --muted: #565d69;
+  --muted-2: #848b97;
+  --shadow: 0 20px 45px rgba(20, 24, 30, 0.14);
+  --hover: rgba(30, 34, 40, 0.05);
+  --scrim: rgba(20, 24, 30, 0.32);
+  --glow-1: rgba(97, 175, 239, 0.12);
+  --glow-2: rgba(97, 175, 239, 0.08);
+  --grad-l1: 74%;
+  --grad-l2: 62%;
+}
+
+/* Night Owl: deep navy with one blue. */
 [data-palette='night-owl'] {
   color-scheme: dark;
   --accent: #82aaff;
-  --accent-2: #c792ea;
+  --accent-2: #9fc4ff;
   --accent-alt: #5f7e97;
   --accent-ink: #03111c;
   --accent-soft: rgba(130, 170, 255, 0.16);
@@ -228,10 +365,299 @@
   --hover: rgba(255, 255, 255, 0.05);
   --scrim: rgba(1, 10, 18, 0.7);
   --glow-1: rgba(130, 170, 255, 0.14);
-  --glow-2: rgba(199, 146, 234, 0.1);
+  --glow-2: rgba(130, 170, 255, 0.1);
 
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 218;
+  --grad-s1: 52%;
+  --grad-s2: 48%;
   --grad-l1: 42%;
   --grad-l2: 28%;
+}
+[data-palette='night-owl'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #2b74c4;
+  --accent-2: #1f5f9e;
+  --accent-alt: #1b4f83;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(43, 116, 196, 0.12);
+  --accent-line: rgba(43, 116, 196, 0.32);
+  --danger: #d64545;
+
+  --bg: #f4f8fb;
+  --bg-2: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #ecf3f9;
+  --field: rgba(20, 40, 60, 0.05);
+  --line: rgba(20, 40, 60, 0.09);
+  --line-strong: rgba(20, 40, 60, 0.18);
+  --text: #0b2942;
+  --muted: #4f6b80;
+  --muted-2: #7c94a8;
+  --shadow: 0 20px 45px rgba(10, 35, 55, 0.12);
+  --hover: rgba(20, 40, 60, 0.05);
+  --scrim: rgba(5, 25, 40, 0.3);
+  --glow-1: rgba(130, 170, 255, 0.14);
+  --glow-2: rgba(130, 170, 255, 0.1);
+  --grad-l1: 76%;
+  --grad-l2: 64%;
+}
+
+/* Monokai: one pink. */
+[data-palette='monokai'] {
+  color-scheme: dark;
+  --accent: #f92672;
+  --accent-2: #ff5c93;
+  --accent-alt: #c2185b;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(249, 38, 114, 0.16);
+  --accent-line: rgba(249, 38, 114, 0.4);
+  --danger: #ff4d6d;
+
+  --bg: #1e1f1c;
+  --bg-2: #272822;
+  --panel: #2b2c26;
+  --panel-2: #33342c;
+  --field: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #f8f8f2;
+  --muted: #a6a695;
+  --muted-2: #75766a;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --hover: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(10, 10, 8, 0.68);
+  --glow-1: rgba(249, 38, 114, 0.14);
+  --glow-2: rgba(249, 38, 114, 0.1);
+
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 337;
+  --grad-s1: 62%;
+  --grad-s2: 58%;
+  --grad-l1: 46%;
+  --grad-l2: 32%;
+}
+[data-palette='monokai'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #d81b60;
+  --accent-2: #b0164c;
+  --accent-alt: #ad1457;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(216, 27, 96, 0.12);
+  --accent-line: rgba(216, 27, 96, 0.32);
+  --danger: #e53950;
+
+  --bg: #faf8f5;
+  --bg-2: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f4f1ec;
+  --field: rgba(40, 40, 34, 0.05);
+  --line: rgba(40, 40, 34, 0.1);
+  --line-strong: rgba(40, 40, 34, 0.2);
+  --text: #272822;
+  --muted: #6b6b5f;
+  --muted-2: #94948a;
+  --shadow: 0 20px 45px rgba(40, 40, 34, 0.12);
+  --hover: rgba(40, 40, 34, 0.05);
+  --scrim: rgba(30, 30, 25, 0.3);
+  --glow-1: rgba(249, 38, 114, 0.12);
+  --glow-2: rgba(249, 38, 114, 0.08);
+  --grad-l1: 76%;
+  --grad-l2: 64%;
+}
+
+/* Dracula: one violet. */
+[data-palette='dracula'] {
+  color-scheme: dark;
+  --accent: #bd93f9;
+  --accent-2: #d6b8ff;
+  --accent-alt: #9580c9;
+  --accent-ink: #1b1530;
+  --accent-soft: rgba(189, 147, 249, 0.16);
+  --accent-line: rgba(189, 147, 249, 0.4);
+  --danger: #ff5555;
+
+  --bg: #282a36;
+  --bg-2: #21222c;
+  --panel: #2f3140;
+  --panel-2: #383a4a;
+  --field: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #f8f8f2;
+  --muted: #a8aabf;
+  --muted-2: #6f7285;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --hover: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(18, 18, 26, 0.68);
+  --glow-1: rgba(189, 147, 249, 0.15);
+  --glow-2: rgba(189, 147, 249, 0.1);
+
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 265;
+  --grad-s1: 58%;
+  --grad-s2: 54%;
+  --grad-l1: 50%;
+  --grad-l2: 36%;
+}
+[data-palette='dracula'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #7c4dcc;
+  --accent-2: #6a3fb5;
+  --accent-alt: #5f35a8;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(124, 77, 204, 0.12);
+  --accent-line: rgba(124, 77, 204, 0.32);
+  --danger: #d64545;
+
+  --bg: #f8f6ff;
+  --bg-2: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f1eefc;
+  --field: rgba(50, 40, 80, 0.05);
+  --line: rgba(50, 40, 80, 0.1);
+  --line-strong: rgba(50, 40, 80, 0.2);
+  --text: #282a36;
+  --muted: #5f6175;
+  --muted-2: #8d8fa3;
+  --shadow: 0 20px 45px rgba(40, 30, 70, 0.12);
+  --hover: rgba(50, 40, 80, 0.05);
+  --scrim: rgba(35, 28, 55, 0.3);
+  --glow-1: rgba(189, 147, 249, 0.13);
+  --glow-2: rgba(189, 147, 249, 0.09);
+  --grad-l1: 76%;
+  --grad-l2: 64%;
+}
+
+/* Nord: one ice blue. */
+[data-palette='nord'] {
+  color-scheme: dark;
+  --accent: #88c0d0;
+  --accent-2: #9fd3e0;
+  --accent-alt: #6a9fb0;
+  --accent-ink: #1b2430;
+  --accent-soft: rgba(136, 192, 208, 0.16);
+  --accent-line: rgba(136, 192, 208, 0.4);
+  --danger: #bf616a;
+
+  --bg: #2e3440;
+  --bg-2: #292e39;
+  --panel: #3b4252;
+  --panel-2: #434c5e;
+  --field: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #eceff4;
+  --muted: #aab3c0;
+  --muted-2: #7b869a;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --hover: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(24, 28, 36, 0.68);
+  --glow-1: rgba(136, 192, 208, 0.14);
+  --glow-2: rgba(136, 192, 208, 0.1);
+
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 193;
+  --grad-s1: 52%;
+  --grad-s2: 48%;
+  --grad-l1: 48%;
+  --grad-l2: 34%;
+}
+[data-palette='nord'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #4a7c8c;
+  --accent-2: #3d6a78;
+  --accent-alt: #355c69;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(74, 124, 140, 0.12);
+  --accent-line: rgba(74, 124, 140, 0.32);
+  --danger: #a94452;
+
+  --bg: #f3f6f8;
+  --bg-2: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #edf1f4;
+  --field: rgba(46, 52, 64, 0.05);
+  --line: rgba(46, 52, 64, 0.1);
+  --line-strong: rgba(46, 52, 64, 0.2);
+  --text: #2e3440;
+  --muted: #5a6472;
+  --muted-2: #8892a0;
+  --shadow: 0 20px 45px rgba(46, 52, 64, 0.12);
+  --hover: rgba(46, 52, 64, 0.05);
+  --scrim: rgba(30, 36, 46, 0.3);
+  --glow-1: rgba(136, 192, 208, 0.14);
+  --glow-2: rgba(136, 192, 208, 0.1);
+  --grad-l1: 76%;
+  --grad-l2: 64%;
+}
+
+/* Gruvbox: one warm yellow. */
+[data-palette='gruvbox'] {
+  color-scheme: dark;
+  --accent: #fabd2f;
+  --accent-2: #ffd166;
+  --accent-alt: #d79921;
+  --accent-ink: #1d2021;
+  --accent-soft: rgba(250, 189, 47, 0.16);
+  --accent-line: rgba(250, 189, 47, 0.4);
+  --danger: #fb4934;
+
+  --bg: #282828;
+  --bg-2: #1d2021;
+  --panel: #32302f;
+  --panel-2: #3c3836;
+  --field: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #ebdbb2;
+  --muted: #a89984;
+  --muted-2: #7c6f64;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --hover: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(20, 20, 18, 0.68);
+  --glow-1: rgba(250, 189, 47, 0.14);
+  --glow-2: rgba(250, 189, 47, 0.1);
+
+  --hue-mix: 0;
+  --hue-spread: 0;
+  --hue-base: 40;
+  --grad-s1: 58%;
+  --grad-s2: 54%;
+  --grad-l1: 46%;
+  --grad-l2: 32%;
+}
+[data-palette='gruvbox'][data-theme='light'] {
+  color-scheme: light;
+  --accent: #b57614;
+  --accent-2: #9d5f0f;
+  --accent-alt: #8f5b12;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(181, 118, 20, 0.12);
+  --accent-line: rgba(181, 118, 20, 0.32);
+  --danger: #9d0006;
+
+  --bg: #fbf1c7;
+  --bg-2: #f9f5d7;
+  --panel: #f9f5d7;
+  --panel-2: #f2e5bc;
+  --field: rgba(60, 56, 54, 0.06);
+  --line: rgba(60, 56, 54, 0.12);
+  --line-strong: rgba(60, 56, 54, 0.22);
+  --text: #3c3836;
+  --muted: #665c54;
+  --muted-2: #928374;
+  --shadow: 0 20px 45px rgba(60, 56, 54, 0.14);
+  --hover: rgba(60, 56, 54, 0.06);
+  --scrim: rgba(50, 45, 40, 0.3);
+  --glow-1: rgba(250, 189, 47, 0.14);
+  --glow-2: rgba(250, 189, 47, 0.1);
+  --grad-l1: 78%;
+  --grad-l2: 66%;
 }
 
 /* ---------- Reset ---------- */
@@ -976,8 +1402,11 @@ select option {
 .thumb.placeholder {
   background-image: linear-gradient(
     135deg,
-    hsl(var(--hue, 260) var(--grad-s1) var(--grad-l1)),
-    hsl(calc(var(--hue, 260) + 45) var(--grad-s2) var(--grad-l2))
+    hsl(calc(var(--hue, 260) * var(--hue-mix) + var(--hue-base)) var(--grad-s1) var(--grad-l1)),
+    hsl(
+      calc(var(--hue, 260) * var(--hue-mix) + var(--hue-base) + var(--hue-spread))
+        var(--grad-s2) var(--grad-l2)
+    )
   );
 }
 
@@ -1159,8 +1588,11 @@ select option {
 .np-art-inner.placeholder {
   background-image: linear-gradient(
     135deg,
-    hsl(var(--hue, 260) var(--grad-s1) var(--grad-l1)),
-    hsl(calc(var(--hue, 260) + 45) var(--grad-s2) var(--grad-l2))
+    hsl(calc(var(--hue, 260) * var(--hue-mix) + var(--hue-base)) var(--grad-s1) var(--grad-l1)),
+    hsl(
+      calc(var(--hue, 260) * var(--hue-mix) + var(--hue-base) + var(--hue-spread))
+        var(--grad-s2) var(--grad-l2)
+    )
   );
 }
 .np-art-expand {
@@ -1254,7 +1686,12 @@ select option {
 /* The other palettes paint the play button with their own accent. */
 [data-palette='amber'] .play-btn,
 [data-palette='one-dark'] .play-btn,
-[data-palette='night-owl'] .play-btn {
+[data-palette='one-dark-flat'] .play-btn,
+[data-palette='night-owl'] .play-btn,
+[data-palette='monokai'] .play-btn,
+[data-palette='dracula'] .play-btn,
+[data-palette='nord'] .play-btn,
+[data-palette='gruvbox'] .play-btn {
   color: var(--accent-ink);
   background: var(--accent);
   box-shadow: 0 8px 22px var(--accent-soft);
@@ -1521,8 +1958,11 @@ input[type='range']::-moz-range-thumb {
 .np-cover-inner.placeholder {
   background-image: linear-gradient(
     135deg,
-    hsl(var(--hue, 260) var(--grad-s1) var(--grad-l1)),
-    hsl(calc(var(--hue, 260) + 45) var(--grad-s2) var(--grad-l2))
+    hsl(calc(var(--hue, 260) * var(--hue-mix) + var(--hue-base)) var(--grad-s1) var(--grad-l1)),
+    hsl(
+      calc(var(--hue, 260) * var(--hue-mix) + var(--hue-base) + var(--hue-spread))
+        var(--grad-s2) var(--grad-l2)
+    )
   );
 }
 
@@ -1998,17 +2438,11 @@ kbd {
 [data-theme='light'] .icon-sun {
   display: none;
 }
-/* A dark-only palette keeps the app dark, so the sun is the honest icon. */
-[data-palette='vercel'] .icon-sun,
-[data-palette='amber'] .icon-sun,
-[data-palette='one-dark'] .icon-sun,
-[data-palette='night-owl'] .icon-sun {
+/* Vercel never leaves dark, so the sun is the honest icon there. */
+[data-palette='vercel'] .icon-sun {
   display: block;
 }
-[data-palette='vercel'] .icon-moon,
-[data-palette='amber'] .icon-moon,
-[data-palette='one-dark'] .icon-moon,
-[data-palette='night-owl'] .icon-moon {
+[data-palette='vercel'] .icon-moon {
   display: none;
 }
 
